@@ -6,8 +6,8 @@
  * @link       http://example.com
  * @since      1.0.0
  *
- * @package    Growtype_Cpt
- * @subpackage growtype_cpt/includes
+ * @package    Growtype_Analytics
+ * @subpackage growtype_analytics/includes
  */
 
 /**
@@ -16,11 +16,11 @@
  * This class defines all code necessary to run during the plugin's deactivation.
  *
  * @since      1.0.0
- * @package    Growtype_Cpt
- * @subpackage growtype_cpt/includes
+ * @package    Growtype_Analytics
+ * @subpackage growtype_analytics/includes
  * @author     Your Name <email@example.com>
  */
-class Growtype_Cpt_Deactivator
+class Growtype_Analytics_Deactivator
 {
 
     /**

@@ -6,8 +6,8 @@
  * @link       http://example.com
  * @since      1.0.0
  *
- * @package    Growtype_Cpt
- * @subpackage growtype_cpt/admin
+ * @package    Growtype_Analytics
+ * @subpackage growtype_analytics/admin
  */
 
 /**
@@ -16,11 +16,11 @@
  * Defines the plugin name, version, and two examples hooks for how to
  * enqueue the admin-specific stylesheet and JavaScript.
  *
- * @package    Growtype_Cpt
- * @subpackage growtype_cpt/admin
+ * @package    Growtype_Analytics
+ * @subpackage growtype_analytics/admin
  * @author     Your Name <email@example.com>
  */
-class Growtype_Cpt_Admin
+class Growtype_Analytics_Admin
 {
 
     /**
@@ -28,9 +28,9 @@ class Growtype_Cpt_Admin
      *
      * @since    1.0.0
      * @access   private
-     * @var      string $growtype_cpt The ID of this plugin.
+     * @var      string $growtype_analytics The ID of this plugin.
      */
-    private $growtype_cpt;
+    private $growtype_analytics;
 
     /**
      * The version of this plugin.
@@ -48,13 +48,13 @@ class Growtype_Cpt_Admin
     /**
      * Initialize the class and set its properties.
      *
-     * @param string $growtype_cpt The name of this plugin.
+     * @param string $growtype_analytics The name of this plugin.
      * @param string $version The version of this plugin.
      * @since    1.0.0
      */
-    public function __construct($growtype_cpt, $version)
+    public function __construct($growtype_analytics, $version)
     {
-        $this->growtype_cpt = $growtype_cpt;
+        $this->growtype_analytics = $growtype_analytics;
         $this->version = $version;
 
         if (is_admin()) {
@@ -72,7 +72,7 @@ class Growtype_Cpt_Admin
      */
     public function enqueue_styles()
     {
-        wp_enqueue_style($this->growtype_cpt, GROWTYPE_CPT_URL . 'admin/css/growtype-cpt-admin.css', array (), $this->version, 'all');
+        wp_enqueue_style($this->growtype_analytics, GROWTYPE_ANALYTICS_URL . 'admin/css/growtype-analytics-admin.css', array (), $this->version, 'all');
     }
 
     /**
@@ -82,7 +82,7 @@ class Growtype_Cpt_Admin
      */
     public function enqueue_scripts()
     {
-        wp_enqueue_script($this->growtype_cpt, GROWTYPE_CPT_URL . 'admin/js/growtype-cpt-admin.js', array ('jquery'), $this->version, false);
+        wp_enqueue_script($this->growtype_analytics, GROWTYPE_ANALYTICS_URL . 'admin/js/growtype-analytics-admin.js', array ('jquery'), $this->version, false);
     }
 
     /**
@@ -94,7 +94,7 @@ class Growtype_Cpt_Admin
         /**
          * Settings
          */
-        require_once GROWTYPE_CPT_PATH . 'admin/methods/settings/index.php';
-        $this->methods = new Growtype_Cpt_Admin_Settings();
+        require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/settings/index.php';
+        $this->methods = new Growtype_Analytics_Admin_Settings();
     }
 }

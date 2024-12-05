@@ -14,33 +14,33 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Loco https://localise.biz/\n"
 "X-Loco-Version: 2.6.3; wp-6.1.1\n"
-"X-Domain: growtype-cpt"
+"X-Domain: growtype-analytics"
 
 #. Description of the plugin
 msgid "Advanced search functionality for modern websites."
 msgstr "Išplėstinė šiuolaikinių svetainių paieškos funkcija."
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/customizer/index.php:213
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:213
 msgid "Button \"Open Search\" Enabled"
 msgstr "Mygtukas „Atidaryti paiešką“ įjungtas"
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/customizer/index.php:147
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:147
 msgid "Choose search type"
 msgstr "Pasirinkite paieškos tipą"
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/customizer/index.php:127
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:127
 msgid "Disable search"
 msgstr "Išjungti paiešką"
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/customizer/index.php:234
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:234
 msgid "Enable/disable ajax search."
 msgstr "Įjungti / išjungti ajax paiešką."
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/customizer/index.php:215
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:215
 msgid "Enable/disable search open button."
 msgstr "Įjungti / išjungti paieškos atidarymo mygtuką."
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/customizer/index.php:129
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:129
 msgid "Enable/disable search."
 msgstr "Įjungti / išjungti paiešką."
 
@@ -49,7 +49,7 @@ msgid "Growtype"
 msgstr "Augimo tipas"
 
 #. Name of the plugin
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/customizer/index.php:111
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:111
 msgid "Growtype - Search"
 msgstr "Augimo tipas – paieška"
 
@@ -58,54 +58,54 @@ msgstr "Augimo tipas – paieška"
 msgid "http://growtype.com/"
 msgstr "http://growtype.com/"
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/customizer/index.php:193
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:193
 msgid "In which pages search available."
 msgstr "Kuriuose puslapiuose galima ieškoti."
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/customizer/index.php:250
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:250
 msgid "Intro Text"
 msgstr "Intro tekstas"
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/customizer/index.php:192
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:192
 msgid "Pages"
 msgstr "Puslapiai"
 
-#: ../../../../../../packages/plugins/growtype-cpt/resources/views/search/form/index.php:12
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/form/index.php:12
 msgid "Search"
 msgstr "Ieškoti"
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/customizer/index.php:146
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:146
 msgid "Search Type"
 msgstr "Paieškos tipas"
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/shortcodes/class-growtype-cpt-shortcode.php:32
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/shortcodes/class-growtype-analytics-shortcode.php:32
 msgid "Search..."
 msgstr "Ieškoti..."
 
-#: ../../../../../../packages/plugins/growtype-cpt/resources/views/search/form/actions/index.php:2
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/form/actions/index.php:2
 msgid "Show less"
 msgstr "Rodyti mažiau"
 
-#: ../../../../../../packages/plugins/growtype-cpt/resources/views/search/form/actions/index.php:2
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/form/actions/index.php:2
 msgid "Show more"
 msgstr "Rodyti daugiau"
 
-#: ../../../../../../packages/plugins/growtype-cpt/includes/methods/search/ajax/index.php:9
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/search/ajax/index.php:9
 msgid "Something went wrong"
 msgstr "Klaida. Bandykite dar kartą."
 
-#: ../../../../../../packages/plugins/growtype-cpt/resources/views/search/ajax/no-result.php:7
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/ajax/no-result.php:7
 msgid "Try more general keywords."
 msgstr "Pabandykite bendresnius raktinius žodžius."
 
-#: ../../../../../../packages/plugins/growtype-cpt/resources/views/search/ajax/no-result.php:6
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/ajax/no-result.php:6
 msgid "Try other keywords."
 msgstr "Pabandykite kitus raktinius žodžius."
 
-#: ../../../../../../packages/plugins/growtype-cpt/resources/views/search/ajax/no-result.php:8
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/ajax/no-result.php:8
 msgid "Use fewer keywords."
 msgstr "Naudokite mažiau raktinių žodžių."
 
-#: ../../../../../../packages/plugins/growtype-cpt/resources/views/search/ajax/no-result.php:3
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/ajax/no-result.php:3
 msgid "Your search did not match any results."
 msgstr "Jūsų paieška neatitiko jokių rezultatų."

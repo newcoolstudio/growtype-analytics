@@ -6,8 +6,8 @@
  * @link       http://example.com
  * @since      1.0.0
  *
- * @package    Growtype_Cpt
- * @subpackage growtype_cpt/includes
+ * @package    Growtype_Analytics
+ * @subpackage growtype_analytics/includes
  */
 
 use Roots\Sage\Template\Blade;
@@ -20,11 +20,11 @@ use Roots\Sage\Template\BladeProvider;
  * the plugin, and register them with the WordPress API. Call the
  * run function to execute the list of actions and filters.
  *
- * @package    Growtype_Cpt
- * @subpackage growtype_cpt/includes
+ * @package    Growtype_Analytics
+ * @subpackage growtype_analytics/includes
  * @author     Your Name <email@example.com>
  */
-class Growtype_Cpt_Loader
+class Growtype_Analytics_Loader
 {
 
     /**
@@ -141,25 +141,27 @@ class Growtype_Cpt_Loader
      */
     private function load_methods()
     {
-        if (defined('VENDOR_DIR')) {
-            require_once VENDOR_DIR . '/johnbillion/extended-cpts/extended-cpts.php';
-        }
-
         /**
          * Helpers
          */
-        require_once GROWTYPE_CPT_PATH . 'includes/helpers/index.php';
-
-        /**
-         * Crud
-         */
-        require_once GROWTYPE_CPT_PATH . 'includes/methods/crud/index.php';
-        new Growtype_Cpt_Crud();
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/helpers/index.php';
 
         /**
          * Customizer
          */
-        require_once GROWTYPE_CPT_PATH . 'includes/customizer/index.php';
-        new Growtype_Cpt_Customizer_Post();
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/customizer/Growtype_Analytics_Customizer.php';
+        new Growtype_Analytics_Customizer();
+
+        /**
+         * Crud
+         */
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/database/Growtype_Analytics_Database.php';
+        new Growtype_Analytics_Database();
+
+        /**
+         * Crud
+         */
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/tracking/Growtype_Analytics_Tracking.php';
+        new Growtype_Analytics_Tracking();
     }
 }

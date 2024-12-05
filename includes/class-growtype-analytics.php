@@ -9,8 +9,8 @@
  * @link       http://example.com
  * @since      1.0.0
  *
- * @package    Growtype_Cpt
- * @subpackage growtype_cpt/includes
+ * @package    Growtype_Analytics
+ * @subpackage growtype_analytics/includes
  */
 
 /**
@@ -23,11 +23,11 @@
  * version of the plugin.
  *
  * @since      1.0.0
- * @package    Growtype_Cpt
- * @subpackage growtype_cpt/includes
+ * @package    Growtype_Analytics
+ * @subpackage growtype_analytics/includes
  * @author     Your Name <email@example.com>
  */
-class Growtype_Cpt
+class Growtype_Analytics
 {
     public $session = null;
 
@@ -37,7 +37,7 @@ class Growtype_Cpt
      *
      * @since    1.0.0
      * @access   protected
-     * @var      Growtype_Cpt_Loader $loader Maintains and registers all hooks for the plugin.
+     * @var      Growtype_Analytics_Loader $loader Maintains and registers all hooks for the plugin.
      */
     protected $loader;
 
@@ -46,9 +46,9 @@ class Growtype_Cpt
      *
      * @since    1.0.0
      * @access   protected
-     * @var      string $Growtype_Cpt The string used to uniquely identify this plugin.
+     * @var      string $Growtype_Analytics The string used to uniquely identify this plugin.
      */
-    protected $Growtype_Cpt;
+    protected $Growtype_Analytics;
 
     /**
      * The current version of the plugin.
@@ -75,13 +75,13 @@ class Growtype_Cpt
      */
     public function __construct()
     {
-        if (defined('GROWTYPE_CPT_VERSION')) {
-            $this->version = GROWTYPE_CPT_VERSION;
+        if (defined('GROWTYPE_ANALYTICS_VERSION')) {
+            $this->version = GROWTYPE_ANALYTICS_VERSION;
         } else {
             $this->version = '1.0.0';
         }
 
-        $this->growtype_cpt = 'growtype-cpt';
+        $this->growtype_analytics = 'growtype-analytics';
 
         $this->load_frontend_traits();
         $this->load_admin_traits();
@@ -110,7 +110,7 @@ class Growtype_Cpt
          * Frontend traits
          */
         spl_autoload_register(function ($traitName) {
-            $fileName = GROWTYPE_CPT_PATH . 'includes/traits/' . $traitName . '.php';
+            $fileName = GROWTYPE_ANALYTICS_PATH . 'includes/traits/' . $traitName . '.php';
 
             if (file_exists($fileName)) {
                 include $fileName;
@@ -127,7 +127,7 @@ class Growtype_Cpt
          * Admin traits
          */
         spl_autoload_register(function ($traitName) {
-            $fileName = GROWTYPE_CPT_PATH . 'admin/traits/' . $traitName . '.php';
+            $fileName = GROWTYPE_ANALYTICS_PATH . 'admin/traits/' . $traitName . '.php';
 
             if (file_exists($fileName)) {
                 include $fileName;
@@ -140,10 +140,10 @@ class Growtype_Cpt
      *
      * Include the following files that make up the plugin:
      *
-     * - Growtype_Cpt_Loader. Orchestrates the hooks of the plugin.
-     * - Growtype_Cpt_i18n. Defines internationalization functionality.
-     * - Growtype_Cpt_Admin. Defines all hooks for the admin area.
-     * - Growtype_Cpt_Public. Defines all hooks for the public side of the site.
+     * - Growtype_Analytics_Loader. Orchestrates the hooks of the plugin.
+     * - Growtype_Analytics_i18n. Defines internationalization functionality.
+     * - Growtype_Analytics_Admin. Defines all hooks for the admin area.
+     * - Growtype_Analytics_Public. Defines all hooks for the public side of the site.
      *
      * Create an instance of the loader which will be used to register the hooks
      * with WordPress.
@@ -158,32 +158,32 @@ class Growtype_Cpt
          * The class responsible for orchestrating the actions and filters of the
          * core plugin.
          */
-        require_once GROWTYPE_CPT_PATH . 'includes/class-growtype-cpt-loader.php';
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/class-growtype-analytics-loader.php';
 
         /**
          * The class responsible for defining internationalization functionality
          * of the plugin.
          */
-        require_once GROWTYPE_CPT_PATH . 'includes/class-growtype-cpt-i18n.php';
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/class-growtype-analytics-i18n.php';
 
         /**
          * The class responsible for defining all actions that occur in the admin area.
          */
-        require_once GROWTYPE_CPT_PATH . 'admin/class-growtype-cpt-admin.php';
+        require_once GROWTYPE_ANALYTICS_PATH . 'admin/class-growtype-analytics-admin.php';
 
         /**
          * The class responsible for defining all actions that occur in the public-facing
          * side of the site.
          */
-        require_once GROWTYPE_CPT_PATH . 'public/class-growtype-cpt-public.php';
+        require_once GROWTYPE_ANALYTICS_PATH . 'public/class-growtype-analytics-public.php';
 
-        $this->loader = new Growtype_Cpt_Loader();
+        $this->loader = new Growtype_Analytics_Loader();
     }
 
     /**
      * Define the locale for this plugin for internationalization.
      *
-     * Uses the Growtype_Cpt_i18n class in order to set the domain and to register the hook
+     * Uses the Growtype_Analytics_i18n class in order to set the domain and to register the hook
      * with WordPress.
      *
      * @since    1.0.0
@@ -191,7 +191,7 @@ class Growtype_Cpt
      */
     private function set_locale()
     {
-        $plugin_i18n = new Growtype_Cpt_i18n();
+        $plugin_i18n = new Growtype_Analytics_i18n();
 
         $this->loader->add_action('plugins_loaded', $plugin_i18n, 'load_plugin_textdomain');
     }
@@ -199,7 +199,7 @@ class Growtype_Cpt
     /**
      * Define the locale for this plugin for internationalization.
      *
-     * Uses the Growtype_Cpt_i18n class in order to set the domain and to register the hook
+     * Uses the Growtype_Analytics_i18n class in order to set the domain and to register the hook
      * with WordPress.
      *
      * @since    1.0.0
@@ -218,9 +218,9 @@ class Growtype_Cpt
      */
     private function define_admin_hooks()
     {
-        $plugin_admin = new Growtype_Cpt_Admin($this->get_growtype_cpt(), $this->get_version());
+        $plugin_admin = new Growtype_Analytics_Admin($this->get_growtype_analytics(), $this->get_version());
 
-        $this->loader->add_action('admin_enqueue_scripts', $plugin_admin, 'enqueue_styles');
+        $this->loader->add_action('admin_enqueue_scripts', $plugin_admin, 'enqueue_styles', 20);
         $this->loader->add_action('admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts');
     }
 
@@ -233,7 +233,7 @@ class Growtype_Cpt
      */
     private function define_public_hooks()
     {
-        $plugin_public = new Growtype_Cpt_Public($this->get_Growtype_Cpt(), $this->get_version());
+        $plugin_public = new Growtype_Analytics_Public($this->get_Growtype_Analytics(), $this->get_version());
 
         $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_styles');
         $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_scripts');
@@ -256,15 +256,15 @@ class Growtype_Cpt
      * @return    string    The name of the plugin.
      * @since     1.0.0
      */
-    public function get_growtype_cpt()
+    public function get_growtype_analytics()
     {
-        return $this->growtype_cpt;
+        return $this->growtype_analytics;
     }
 
     /**
      * The reference to the class that orchestrates the hooks with the plugin.
      *
-     * @return    Growtype_Cpt_Loader    Orchestrates the hooks of the plugin.
+     * @return    Growtype_Analytics_Loader    Orchestrates the hooks of the plugin.
      * @since     1.0.0
      */
     public function get_loader()
@@ -281,109 +281,5 @@ class Growtype_Cpt
     public function get_version()
     {
         return $this->version;
-    }
-
-    /**
-     * @return array[]
-     */
-    public static function get_keys()
-    {
-        $default_options = self::get_default_options();
-
-        return [
-            [
-                'name' => 'Cpt 1',
-                'value' => 'cpt_1',
-                'options' => $default_options
-            ],
-            [
-                'name' => 'Cpt 2',
-                'value' => 'cpt_2',
-                'options' => $default_options
-            ],
-            [
-                'name' => 'Cpt 3',
-                'value' => 'cpt_3',
-                'options' => $default_options
-            ],
-            [
-                'name' => 'Cpt 4',
-                'value' => 'cpt_4',
-                'options' => $default_options
-            ],
-            [
-                'name' => 'Cpt 5',
-                'value' => 'cpt_5',
-                'options' => $default_options
-            ]
-        ];
-    }
-
-    /**
-     * @return string[][]
-     */
-    public static function get_default_options()
-    {
-        return [
-            [
-                'title' => 'Enabled',
-                'name' => 'enabled',
-                'type' => 'checkbox',
-                'default_value' => ''
-            ],
-            [
-                'title' => 'Value',
-                'name' => 'value'
-            ],
-            [
-                'title' => 'Label',
-                'name' => 'label',
-            ],
-            [
-                'title' => 'Slug',
-                'name' => 'slug'
-            ],
-            [
-                'title' => 'Archive Enabled',
-                'name' => 'archive_enabled',
-                'type' => 'checkbox'
-            ],
-            [
-                'title' => 'Single Page Enabled',
-                'name' => 'single_page_enabled',
-                'type' => 'checkbox'
-            ],
-            [
-                'title' => 'Tags Enabled (Same tags for posts)',
-                'name' => 'tags_enabled',
-                'type' => 'checkbox'
-            ]
-        ];
-    }
-
-    /**
-     * @return array
-     */
-    public static function get_active_post_types()
-    {
-        $keys = self::get_keys();
-
-        $active_pt = [];
-        foreach ($keys as $key) {
-            if (isset($key['value'])) {
-                $enabled = get_option($key['value'] . '_enabled');
-                $value = get_option($key['value'] . '_value');
-                $label = get_option($key['value'] . '_label');
-
-                if ($enabled && !empty($value)) {
-                    $active_pt[] = [
-                        'label' => $label,
-                        'value' => $value
-                    ];
-                }
-            }
-        }
-
-        return $active_pt;
     }
 }

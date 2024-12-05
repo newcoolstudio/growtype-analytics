@@ -1,0 +1,111 @@
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Growtype - Search\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-12-08 13:30+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: \n"
+"Language: \n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Loco https://localise.biz/\n"
+"X-Loco-Version: 2.6.3; wp-6.1.1\n"
+"X-Domain: growtype-analytics"
+
+#. Description of the plugin
+msgid "Advanced search functionality for modern websites."
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:213
+msgid "Button \"Open Search\" Enabled"
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:147
+msgid "Choose search type"
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:127
+msgid "Disable search"
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:234
+msgid "Enable/disable ajax search."
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:215
+msgid "Enable/disable search open button."
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:129
+msgid "Enable/disable search."
+msgstr ""
+
+#. Author of the plugin
+msgid "Growtype"
+msgstr ""
+
+#. Name of the plugin
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:111
+msgid "Growtype - Search"
+msgstr ""
+
+#. URI of the plugin
+#. Author URI of the plugin
+msgid "http://growtype.com/"
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:193
+msgid "In which pages search available."
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:250
+msgid "Intro Text"
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:192
+msgid "Pages"
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/form/index.php:12
+msgid "Search"
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/customizer/index.php:146
+msgid "Search Type"
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/shortcodes/class-growtype-analytics-shortcode.php:32
+msgid "Search..."
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/form/actions/index.php:2
+msgid "Show less"
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/form/actions/index.php:2
+msgid "Show more"
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/includes/methods/search/ajax/index.php:9
+msgid "Something went wrong"
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/ajax/no-result.php:7
+msgid "Try more general keywords."
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/ajax/no-result.php:6
+msgid "Try other keywords."
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/ajax/no-result.php:8
+msgid "Use fewer keywords."
+msgstr ""
+
+#: ../../../../../../packages/plugins/growtype-analytics/resources/views/search/ajax/no-result.php:3
+msgid "Your search did not match any results."
+msgstr ""

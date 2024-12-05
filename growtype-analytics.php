@@ -10,18 +10,18 @@
  *
  * @link              http://growtype.com/
  * @since             1.0.0
- * @package           growtype_cpt
+ * @package           growtype_analytics
  *
  * @wordpress-plugin
- * Plugin Name:       Growtype - Cpt
+ * Plugin Name:       Growtype - Analytics
  * Plugin URI:        http://growtype.com/
- * Description:       Advanced custom post type functionality.
+ * Description:       Advanced analytics functionality.
  * Version:           1.0.0
  * Author:            Growtype
  * Author URI:        http://growtype.com/
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
- * Text Domain:       growtype-cpt
+ * Text Domain:       growtype-analytics
  * Domain Path:       /languages
  */
 
@@ -35,56 +35,56 @@ if (!defined('WPINC')) {
  * Start at version 1.0.0 and use SemVer - https://semver.org
  * Rename this for your plugin and update it as you release new versions.
  */
-define('GROWTYPE_CPT_VERSION', '1.0.4');
+define('GROWTYPE_ANALYTICS_VERSION', '1.0.4.4');
 
 /**
  * Plugin text domain
  */
-define('GROWTYPE_CPT_TEXT_DOMAIN', 'growtype-cpt');
+define('GROWTYPE_ANALYTICS_TEXT_DOMAIN', 'growtype-analytics');
 
 /**
  * Plugin dir path
  */
-define('GROWTYPE_CPT_PATH', plugin_dir_path(__FILE__));
+define('GROWTYPE_ANALYTICS_PATH', plugin_dir_path(__FILE__));
 
 /**
  * Plugin url
  */
-define('GROWTYPE_CPT_URL', plugin_dir_url(__FILE__));
+define('GROWTYPE_ANALYTICS_URL', plugin_dir_url(__FILE__));
 
 /**
  * Plugin url public
  */
-define('GROWTYPE_CPT_URL_PUBLIC', plugin_dir_url(__FILE__) . 'public/');
+define('GROWTYPE_ANALYTICS_URL_PUBLIC', plugin_dir_url(__FILE__) . 'public/');
 
 /**
  * The code that runs during plugin activation.
- * This action is documented in includes/class-growtype-cpt-activator.php
+ * This action is documented in includes/class-growtype-analytics-activator.php
  */
-function activate_growtype_cpt()
+function activate_growtype_analytics()
 {
-    require_once GROWTYPE_CPT_PATH . 'includes/class-growtype-cpt-activator.php';
-    Growtype_Cpt_Activator::activate();
+    require_once GROWTYPE_ANALYTICS_PATH . 'includes/class-growtype-analytics-activator.php';
+    Growtype_Analytics_Activator::activate();
 }
 
 /**
  * The code that runs during plugin deactivation.
- * This action is documented in includes/class-growtype-cpt-deactivator.php
+ * This action is documented in includes/class-growtype-analytics-deactivator.php
  */
-function deactivate_growtype_cpt()
+function deactivate_growtype_analytics()
 {
-    require_once GROWTYPE_CPT_PATH . 'includes/class-growtype-cpt-deactivator.php';
-    Growtype_Cpt_Deactivator::deactivate();
+    require_once GROWTYPE_ANALYTICS_PATH . 'includes/class-growtype-analytics-deactivator.php';
+    Growtype_Analytics_Deactivator::deactivate();
 }
 
-register_activation_hook(__FILE__, 'activate_growtype_cpt');
-register_deactivation_hook(__FILE__, 'deactivate_growtype_cpt');
+register_activation_hook(__FILE__, 'activate_growtype_analytics');
+register_deactivation_hook(__FILE__, 'deactivate_growtype_analytics');
 
 /**
  * The core plugin class that is used to define internationalization,
  * admin-specific hooks, and public-facing site hooks.
  */
-require GROWTYPE_CPT_PATH . 'includes/class-growtype-cpt.php';
+require GROWTYPE_ANALYTICS_PATH . 'includes/class-growtype-analytics.php';
 
 /**
  * Begins execution of the plugin.
@@ -95,10 +95,10 @@ require GROWTYPE_CPT_PATH . 'includes/class-growtype-cpt.php';
  *
  * @since    1.0.0
  */
-function run_growtype_cpt()
+function run_growtype_analytics()
 {
-    $plugin = new Growtype_Cpt();
+    $plugin = new Growtype_Analytics();
     $plugin->run();
 }
 
-run_growtype_cpt();
+run_growtype_analytics();

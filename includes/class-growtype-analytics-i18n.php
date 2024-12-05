@@ -9,8 +9,8 @@
  * @link       http://example.com
  * @since      1.0.0
  *
- * @package    Growtype_Cpt
- * @subpackage growtype_cpt/includes
+ * @package    Growtype_Analytics
+ * @subpackage growtype_analytics/includes
  */
 
 /**
@@ -20,11 +20,11 @@
  * so that it is ready for translation.
  *
  * @since      1.0.0
- * @package    Growtype_Cpt
- * @subpackage growtype_cpt/includes
+ * @package    Growtype_Analytics
+ * @subpackage growtype_analytics/includes
  * @author     Your Name <email@example.com>
  */
-class Growtype_Cpt_i18n
+class Growtype_Analytics_i18n
 {
     /**
      * Load the plugin text domain for translation.
@@ -34,9 +34,9 @@ class Growtype_Cpt_i18n
     public function load_plugin_textdomain()
     {
         load_plugin_textdomain(
-            GROWTYPE_CPT_TEXT_DOMAIN,
+            GROWTYPE_ANALYTICS_TEXT_DOMAIN,
             false,
-            GROWTYPE_CPT_TEXT_DOMAIN . '/languages/'
+            GROWTYPE_ANALYTICS_TEXT_DOMAIN . '/languages/'
         );
     }
 }

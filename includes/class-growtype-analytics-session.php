@@ -20,10 +20,10 @@
  * so that it is ready for translation.
  *
  * @since      1.0.0
- * @package    Growtype_Cpt
+ * @package    Growtype_Analytics
  * @subpackage growtype_form/includes
  * @author     Your Name <email@example.com>
  */
-class Growtype_Cpt_Session
+class Growtype_Analytics_Session
 {
 }

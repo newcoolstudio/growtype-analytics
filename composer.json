@@ -1,6 +1,6 @@
 {
-    "name": "newcool/growtype-cpt",
-    "description": "growtype-cpt - 1.0.0",
+    "name": "newcool/growtype-analytics",
+    "description": "growtype-analytics - 1.0.0",
     "type": "wordpress-plugin",
     "require": {
         "php": "^7.0|^8.0"

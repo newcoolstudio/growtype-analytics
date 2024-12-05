@@ -1,58 +1,82 @@
 <?php
 
-class Growtype_Cpt_Admin_Settings
+class Growtype_Analytics_Admin_Settings
 {
     public function __construct()
     {
-        add_action('admin_menu', array ($this, 'growtype_extended_cpt_options_page'));
-        add_action('admin_init', array ($this, 'growtype_extended_cpt_register_settings'));
+        add_action('admin_menu', array ($this, 'growtype_analytics_options_page'));
+        add_action('admin_init', array ($this, 'growtype_analytics_register_settings'));
     }
 
-    function growtype_extended_cpt_options_page()
+    function growtype_analytics_options_page()
     {
         add_options_page(
-            'cpt', // page <title>Title</title>
-            'Growtype - CPT', // menu link text
+            'analytics', // page <title>Title</title>
+            'Growtype - Analytics', // menu link text
             'manage_options', // capability to access the page
-            'cpt-options', // page URL slug
-            array ($this, 'cpt_options_content'), // callback function with content
+            'growtype-analytics-settings', // page URL slug
+            array ($this, 'growtype_analytics_options_content'), // callback function with content
             1 // priority
         );
     }
 
-    function cpt_options_content()
+    function growtype_analytics_options_content()
     {
         echo '<div class="wrap">
-	<h1>CPT options</h1>
+	<h1>Analytics settings</h1>
 	<form method="post" action="options.php">';
 
-        settings_fields('cpt_options_settings'); // settings group name
-        do_settings_sections('cpt-options'); // just a page slug
+        settings_fields('analytics_options_settings'); // settings group name
+        do_settings_sections('growtype-analytics-settings'); // just a page slug
         submit_button();
 
         echo '</form></div>';
     }
 
-    function growtype_extended_cpt_register_settings()
+    function growtype_analytics_register_settings()
     {
-        $cpt_keys = Growtype_Cpt::get_keys();
+        $inputs = [
+            [
+                'name' => 'GTM details',
+                'value' => 'growtype_analytics_gtm_details',
+                'options' => [
+                    [
+                        'title' => 'GTM ID',
+                        'name' => 'gtm_id',
+                        'type' => 'input',
+                        'default_value' => ''
+                    ]
+                ]
+            ],
+            [
+                'name' => 'GA4 details',
+                'value' => 'growtype_analytics_ga4_details',
+                'options' => [
+                    [
+                        'title' => 'GA4 ID',
+                        'name' => 'ga4_id',
+                        'type' => 'input',
+                        'default_value' => ''
+                    ]
+                ]
+            ]
+        ];
 
-        foreach ($cpt_keys as $cpt_key) {
-
-            $key_name = $cpt_key['name'];
-            $key_value = $cpt_key['value'];
-            $options = $cpt_key['options'];
+        foreach ($inputs as $input) {
+            $key_name = $input['name'];
+            $key_value = $input['value'];
+            $options = $input['options'];
 
             add_settings_section(
                 $key_value . '_options_settings', // section ID
                 $key_name, // title (if needed)
                 '', // callback function (if needed)
-                'cpt-options' // page slug
+                'growtype-analytics-settings' // page slug
             );
 
             foreach ($options as $option) {
                 register_setting(
-                    'cpt_options_settings', // settings group name
+                    'analytics_options_settings', // settings group name
                     $key_value . '_' . $option['name'], // option name
                 );
 
@@ -60,7 +84,7 @@ class Growtype_Cpt_Admin_Settings
                     $key_value . '_' . $option['name'],
                     $option['title'],
                     array ($this, 'input_callback'),
-                    'cpt-options',
+                    'growtype-analytics-settings',
                     $key_value . '_options_settings',
                     [
                         'type' => $option['type'] ?? 'text',
