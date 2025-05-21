@@ -48,7 +48,7 @@ class Growtype_Analytics
      * @access   protected
      * @var      string $Growtype_Analytics The string used to uniquely identify this plugin.
      */
-    protected $Growtype_Analytics;
+    protected $growtype_analytics;
 
     /**
      * The current version of the plugin.

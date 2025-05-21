@@ -10,6 +10,9 @@ class Growtype_Analytics_Tracking_Ga
         // WordPress User Registration Event
         add_action('user_register', [$this, 'track_user_registration_event'], 10, 1);
 
+        // WordPress User Login Event
+        add_action('wp_login', [$this, 'track_user_login_event'], 10, 2);
+
         // Inject GTM Scripts in Footer
         add_action('wp_footer', [$this, 'inject_gtm_scripts']);
     }
@@ -77,6 +80,21 @@ class Growtype_Analytics_Tracking_Ga
     }
 
     /**
+     * Tracks user login
+     */
+    public function track_user_login_event($user_login, $user)
+    {
+        $login_data = [
+            'event' => 'user_login',
+            'user_id' => $user->ID,
+            'email' => $user->user_email,
+            'role' => implode(', ', $user->roles),
+        ];
+
+        set_transient('growtype_analytics_tracking_user_login_event_details', $login_data, MINUTE_IN_SECONDS);
+    }
+
+    /**
      * Injects GTM scripts into the footer to push dataLayer events.
      */
     public function inject_gtm_scripts()
@@ -84,6 +102,7 @@ class Growtype_Analytics_Tracking_Ga
         $this->push_extra_gtm_data();
         $this->push_purchase_event_data();
         $this->push_user_registration_event_data();
+        $this->push_user_login_event_data();
         $this->push_checkout_and_payment_events();
     }
 
@@ -127,17 +146,30 @@ class Growtype_Analytics_Tracking_Ga
     }
 
     /**
+     * Pushes user login event data from transient.
+     */
+    private function push_user_login_event_data()
+    {
+        $login_data = get_transient('growtype_analytics_tracking_user_login_event_details');
+        delete_transient('growtype_analytics_tracking_user_login_event_details');
+
+        if ($login_data) {
+            echo $this->generate_data_layer_script($login_data);
+        }
+    }
+
+    /**
      * Pushes checkout and payment page events based on the current page.
      */
     private function push_checkout_and_payment_events()
     {
         $value = class_exists('WooCommerce') && isset(WC()->cart->total) ? WC()->cart->total : '';
         $currency = class_exists('WooCommerce') ? get_woocommerce_currency() : '';
-        $items = class_exists('WooCommerce') ? json_encode(growtype_wc_get_cart_items_gtm()) : [];
+        $items = class_exists('WooCommerce') && class_exists('growtype_wc') ? json_encode(growtype_wc_get_cart_items_gtm()) : [];
         $user_id = apply_filters('growtype_analytics_default_user_id', get_current_user_id());
         $email = growtype_analytics_get_user_email();
 
-        if (class_exists('WooCommerce') && growtype_wc_is_checkout_page()) {
+        if (class_exists('WooCommerce') && class_exists('growtype_wc') && growtype_wc_is_checkout_page()) {
             $checkout_event = [
                 'event' => 'begin_checkout',
                 'value' => $value,
@@ -149,7 +181,7 @@ class Growtype_Analytics_Tracking_Ga
             echo $this->generate_data_layer_script($checkout_event);
         }
 
-        if (class_exists('WooCommerce') && growtype_wc_is_payment_page()) {
+        if (class_exists('WooCommerce') && class_exists('growtype_wc') && growtype_wc_is_payment_page()) {
             $payment_event = [
                 'event' => 'begin_payment',
                 'value' => $value,

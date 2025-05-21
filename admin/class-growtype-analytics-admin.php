@@ -32,6 +32,8 @@ class Growtype_Analytics_Admin
      */
     private $growtype_analytics;
 
+    private $methods;
+
     /**
      * The version of this plugin.
      *

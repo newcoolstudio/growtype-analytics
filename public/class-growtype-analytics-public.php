@@ -43,6 +43,9 @@ class Growtype_Analytics_Public
      */
     private $version;
 
+    private $gtm_id;
+    private $ga4_id;
+
     /**
      * Initialize the class and set its properties.
      *

@@ -41,7 +41,10 @@ class Growtype_Analytics_Tracking
         if (isset($_COOKIE['growtype_analytics_marketing_sources']) && !empty($_COOKIE['growtype_analytics_marketing_sources'])) {
             $userdata = get_userdata($user_id);
             $lead = Growtype_Form_Admin_Lead::get_by_title($userdata->user_email);
-            update_post_meta($lead->ID, 'growtype_analytics_marketing_sources', $_COOKIE['growtype_analytics_marketing_sources'] ?? []);
+
+            if (!empty($lead)) {
+                update_post_meta($lead->ID, 'growtype_analytics_marketing_sources', $_COOKIE['growtype_analytics_marketing_sources'] ?? []);
+            }
         }
     }
 
@@ -52,6 +55,9 @@ class Growtype_Analytics_Tracking
 
         include_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/tracking/services/Growtype_Analytics_Tracking_Fb.php';
         new Growtype_Analytics_Tracking_Fb();
+
+        include_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/tracking/services/Growtype_Analytics_Tracking_Wc.php';
+        new Growtype_Analytics_Tracking_Wc();
     }
 
     function wp_footer_extend()
