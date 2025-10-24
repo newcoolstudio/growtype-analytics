@@ -18,6 +18,7 @@ class Growtype_Analytics_Tracking_Wc
             'utm_campaign',     // Campaign name or identifier
             'utm_term',         // Paid search keyword
             'utm_content',      // Differentiator for A/B testing
+            'utm_marketing_tactic', // Differentiator for A/B testing
 
             // Facebook Ads Parameters
             'fbclid',           // Facebook Click ID (used for tracking Facebook campaigns)

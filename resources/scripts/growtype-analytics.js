@@ -1,5 +1,8 @@
+import "./actions/growtypeAnalyticsPushToDataLayer";
+
 jQuery(document).ready(function ($) {
-    $('a').click(function () {
+    // blade attribute -> data-growtype-analytics-gtm='@json(["event" => "favourite_assistant", "value" => $post->post_name])'
+    $('a,div,span,button').click(function () {
         if (isGtmLoaded()) {
             let value = $(this).attr('data-growtype-analytics-gtm');
 

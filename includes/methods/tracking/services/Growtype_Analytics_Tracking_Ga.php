@@ -4,84 +4,66 @@ class Growtype_Analytics_Tracking_Ga
 {
     public function __construct()
     {
-        // WooCommerce Payment Complete Event
         add_action('woocommerce_payment_complete', [$this, 'track_payment_complete_event'], 10, 4);
-
-        // WordPress User Registration Event
         add_action('user_register', [$this, 'track_user_registration_event'], 10, 1);
-
-        // WordPress User Login Event
         add_action('wp_login', [$this, 'track_user_login_event'], 10, 2);
-
-        // Inject GTM Scripts in Footer
         add_action('wp_footer', [$this, 'inject_gtm_scripts']);
     }
 
-    /**
-     * Tracks WooCommerce payment complete events and stores the data for GTM.
-     */
+    private function add_event_to_transient($event_data)
+    {
+        $user_id = get_current_user_id() ?: 'guest';
+        $key = "gtm_events_{$user_id}";
+        $events = get_transient($key) ?: [];
+        $events[] = $event_data;
+        set_transient($key, $events, MINUTE_IN_SECONDS);
+    }
+
     public function track_payment_complete_event($order_id, $transaction_id)
     {
         $order = wc_get_order($order_id);
+        if (!$order || $order->get_status() !== 'completed') return;
 
-        if ($order) {
+        $items = growtype_wc_get_purchase_items_gtm($order->get_items());
+        $value = $order->get_total();
+        $currency = get_woocommerce_currency();
+        $user_id = apply_filters('growtype_analytics_default_user_id', get_current_user_id());
+        $email = growtype_analytics_get_user_email();
+        $transaction_id = $transaction_id ?: $order->get_order_number();
 
-            if (!in_array($order->get_status(), ['completed'])) {
-                return;
-            }
+        $purchase_data = [
+            'event' => 'purchase',
+            'user_id' => $user_id,
+            'email' => $email,
+            'ecommerce' => [
+                'transaction_id' => $transaction_id,
+                'value' => $value,
+                'currency' => $currency,
+                'tax' => '',
+                'shipping' => '',
+                'coupon' => '',
+                'items' => $items,
+            ],
+        ];
 
-            $order_items = $order->get_items();
-            $value = $order->get_total();
-            $currency = get_woocommerce_currency();
-            $items = growtype_wc_get_purchase_items_gtm($order_items);
-            $user_id = apply_filters('growtype_analytics_default_user_id', get_current_user_id());
-            $email = growtype_analytics_get_user_email();
-
-            if (empty($transaction_id)) {
-                $transaction_id = $order->get_order_number();
-            }
-
-            $purchase_data = [
-                'event' => 'purchase',
-                'user_id' => $user_id,
-                'email' => $email,
-                'ecommerce' => [
-                    'transaction_id' => $transaction_id,
-                    'value' => $value,
-                    'currency' => $currency,
-                    'tax' => '',
-                    'shipping' => '',
-                    'coupon' => '',
-                    'items' => $items,
-                ],
-            ];
-
-            set_transient('growtype_analytics_tracking_gtm_purchase_event_details', $purchase_data, MINUTE_IN_SECONDS);
-        }
+        $this->add_event_to_transient($purchase_data);
     }
 
-    /**
-     * Tracks user registration events and stores the data for GTM.
-     */
     public function track_user_registration_event($user_id)
     {
         $user = get_userdata($user_id);
+        if (!$user) return;
 
-        if ($user) {
-            $registration_data = [
-                'event' => 'user_registered',
-                'user_id' => $user_id,
-                'email' => $user->user_email,
-                'role' => implode(', ', $user->roles),
-            ];
+        $registration_data = [
+            'event' => 'user_registered',
+            'user_id' => $user_id,
+            'email' => $user->user_email,
+            'role' => implode(', ', $user->roles),
+        ];
 
-            set_transient('growtype_analytics_tracking_user_registration_event_details', $registration_data, MINUTE_IN_SECONDS);
-        }
+        $this->add_event_to_transient($registration_data);
     }
 
-    /**
-     * Tracks user login
-     */
     public function track_user_login_event($user_login, $user)
     {
         $login_data = [
@@ -91,130 +73,67 @@ class Growtype_Analytics_Tracking_Ga
             'role' => implode(', ', $user->roles),
         ];
 
-        set_transient('growtype_analytics_tracking_user_login_event_details', $login_data, MINUTE_IN_SECONDS);
+        $this->add_event_to_transient($login_data);
     }
 
-    /**
-     * Injects GTM scripts into the footer to push dataLayer events.
-     */
     public function inject_gtm_scripts()
     {
-        $this->push_extra_gtm_data();
-        $this->push_purchase_event_data();
-        $this->push_user_registration_event_data();
-        $this->push_user_login_event_data();
+        $user_id = get_current_user_id() ?: 'guest';
+        $key = "gtm_events_{$user_id}";
+        $events = get_transient($key);
+        delete_transient($key);
+
+        if (!empty($events)) {
+            foreach ($events as $event) {
+                $clear_history = isset($event['event']) && $event['event'] === 'purchase';
+                echo $this->generate_data_layer_script($event, $clear_history);
+            }
+        }
+
         $this->push_checkout_and_payment_events();
     }
 
-    /**
-     * Pushes additional GTM data from transient.
-     */
-    private function push_extra_gtm_data()
-    {
-        $extra_data = get_transient('growtype_analytics_tracking_gtm_extra_details');
-        delete_transient('growtype_analytics_tracking_gtm_extra_details');
-
-        if ($extra_data) {
-            echo $this->generate_data_layer_script($extra_data);
-        }
-    }
-
-    /**
-     * Pushes purchase event data from transient.
-     */
-    private function push_purchase_event_data()
-    {
-        $purchase_data = get_transient('growtype_analytics_tracking_gtm_purchase_event_details');
-        delete_transient('growtype_analytics_tracking_gtm_purchase_event_details');
-
-        if ($purchase_data && class_exists('WooCommerce') && growtype_wc_is_thankyou_page()) {
-            echo $this->generate_data_layer_script($purchase_data, true);
-        }
-    }
-
-    /**
-     * Pushes user registration event data from transient.
-     */
-    private function push_user_registration_event_data()
-    {
-        $registration_data = get_transient('growtype_analytics_tracking_user_registration_event_details');
-        delete_transient('growtype_analytics_tracking_user_registration_event_details');
-
-        if ($registration_data) {
-            echo $this->generate_data_layer_script($registration_data);
-        }
-    }
-
-    /**
-     * Pushes user login event data from transient.
-     */
-    private function push_user_login_event_data()
-    {
-        $login_data = get_transient('growtype_analytics_tracking_user_login_event_details');
-        delete_transient('growtype_analytics_tracking_user_login_event_details');
-
-        if ($login_data) {
-            echo $this->generate_data_layer_script($login_data);
-        }
-    }
-
-    /**
-     * Pushes checkout and payment page events based on the current page.
-     */
     private function push_checkout_and_payment_events()
     {
-        $value = class_exists('WooCommerce') && isset(WC()->cart->total) ? WC()->cart->total : '';
-        $currency = class_exists('WooCommerce') ? get_woocommerce_currency() : '';
-        $items = class_exists('WooCommerce') && class_exists('growtype_wc') ? json_encode(growtype_wc_get_cart_items_gtm()) : [];
+        $is_wc = class_exists('WooCommerce');
+        $is_growtype_wc = class_exists('growtype_wc');
+        $is_checkout = $is_growtype_wc && growtype_wc_is_checkout_page();
+        $is_payment = $is_growtype_wc && growtype_wc_is_payment_page();
+
+        if (!$is_wc || !$is_growtype_wc || (!$is_checkout && !$is_payment)) return;
+
+        $value = WC()->cart->total ?? '';
+        $currency = get_woocommerce_currency();
+        $items = json_encode(growtype_wc_get_cart_items_gtm());
         $user_id = apply_filters('growtype_analytics_default_user_id', get_current_user_id());
         $email = growtype_analytics_get_user_email();
 
-        if (class_exists('WooCommerce') && class_exists('growtype_wc') && growtype_wc_is_checkout_page()) {
-            $checkout_event = [
-                'event' => 'begin_checkout',
-                'value' => $value,
-                'currency' => $currency,
-                'items' => $items,
-                'user_id' => $user_id,
-                'email' => $email,
-            ];
-            echo $this->generate_data_layer_script($checkout_event);
-        }
+        $event_type = $is_checkout ? 'begin_checkout' : 'begin_payment';
+        $event_data = [
+            'event' => $event_type,
+            'value' => $value,
+            'currency' => $currency,
+            'items' => $items,
+            'user_id' => $user_id,
+            'email' => $email,
+        ];
 
-        if (class_exists('WooCommerce') && class_exists('growtype_wc') && growtype_wc_is_payment_page()) {
-            $payment_event = [
-                'event' => 'begin_payment',
-                'value' => $value,
-                'currency' => $currency,
-                'items' => $items,
-                'user_id' => $user_id,
-                'email' => $email,
-            ];
-            echo $this->generate_data_layer_script($payment_event);
-        }
+        echo $this->generate_data_layer_script($event_data);
     }
 
-    /**
-     * Generates a <script> block to push data to the dataLayer.
-     *
-     * @param array $data Data to be pushed to the dataLayer.
-     * @param bool $clear_history Whether to clear browser history to prevent duplicate events.
-     * @return string The script block.
-     */
     private function generate_data_layer_script($data, $clear_history = false)
     {
+        $json_data = json_encode($data);
         $script = "<script>
             if (window.dataLayer) {
-                window.dataLayer.push(" . json_encode($data) . ");
-        ";
+                window.dataLayer.push({$json_data});";
 
         if ($clear_history) {
             $script .= "
                 history.pushState(null, document.title, location.href);
                 window.addEventListener('popstate', function () {
                     history.pushState(null, document.title, location.href);
-                });
-            ";
+                });";
         }
 
         $script .= "}
