@@ -6,6 +6,7 @@ class Growtype_Analytics_Public
 
     private $growtype_analytics;
     private $version;
+    private $gtm_enabled;
     private $gtm_id;
     private $ga4_id;
 
@@ -14,11 +15,14 @@ class Growtype_Analytics_Public
         $this->growtype_analytics = $growtype_analytics;
         $this->version = $version;
 
-        $this->gtm_id = get_option('growtype_analytics_gtm_details_gtm_id');
+        $this->gtm_enabled = get_option('growtype_analytics_gtm_details_enabled');
+
+        $this->gtm_id = $this->gtm_enabled ? get_option('growtype_analytics_gtm_details_gtm_id') : null;
+
         $this->ga4_id = get_option('growtype_analytics_ga4_details_ga4_id');
 
         // Add scripts to <body> for better performance
-        add_action('wp_body_open', array($this, 'add_scripts_to_body_open'));
+        add_action('wp_body_open', array ($this, 'add_scripts_to_body_open'));
     }
 
     /**
@@ -66,7 +70,7 @@ gtag('config', '" . esc_js($this->ga4_id) . "');
         wp_enqueue_style(
             $this->growtype_analytics,
             GROWTYPE_ANALYTICS_URL_PUBLIC . 'styles/growtype-analytics.css',
-            array(),
+            array (),
             $this->version,
             'all'
         );
@@ -80,7 +84,7 @@ gtag('config', '" . esc_js($this->ga4_id) . "');
         wp_enqueue_script(
             $this->growtype_analytics,
             GROWTYPE_ANALYTICS_URL_PUBLIC . 'scripts/growtype-analytics.js',
-            array('jquery'),
+            array ('jquery'),
             $this->version,
             true
         );
@@ -91,7 +95,7 @@ gtag('config', '" . esc_js($this->ga4_id) . "');
             $ajax_url = admin_url('admin-ajax.php?lang=' . qtranxf_getLanguage());
         }
 
-        wp_localize_script($this->growtype_analytics, 'growtype_analytics_ajax', array(
+        wp_localize_script($this->growtype_analytics, 'growtype_analytics_ajax', array (
             'url' => $ajax_url,
             'nonce' => wp_create_nonce('ajax-nonce'),
             'action' => self::GROWTYPE_ANALYTICS_AJAX_ACTION,

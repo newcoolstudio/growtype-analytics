@@ -43,7 +43,9 @@ class Growtype_Analytics_Tracking
             $lead = Growtype_Form_Admin_Lead::get_by_title($userdata->user_email);
 
             if (!empty($lead)) {
-                update_post_meta($lead->ID, 'growtype_analytics_marketing_sources', $_COOKIE['growtype_analytics_marketing_sources'] ?? []);
+                // SECURITY: Sanitize cookie data before storing
+                $cookie_data = sanitize_text_field($_COOKIE['growtype_analytics_marketing_sources']);
+                update_post_meta($lead->ID, 'growtype_analytics_marketing_sources', $cookie_data);
             }
         }
     }
@@ -95,7 +97,9 @@ class Growtype_Analytics_Tracking
          * Marketing sources
          */
         if (isset($_GET) && !empty($_GET) && !is_user_logged_in()) {
-            $marketing_sources = apply_filters('growtype_analytics_marketing_sources', $_GET ?? []);
+            // SECURITY: Sanitize all GET parameters to prevent XSS
+            $sanitized_get = array_map('sanitize_text_field', $_GET);
+            $marketing_sources = apply_filters('growtype_analytics_marketing_sources', $sanitized_get);
             ?>
             <script>
                 function growtypeAnalyticsUpdateMarketingSources() {
@@ -108,8 +112,8 @@ class Growtype_Analytics_Tracking
                     // Flag to keep track of whether any new marketing source was added
                     let anyNewSourceAdded = false;
 
-                    // Get the URL query parameters
-                    let searchParams = JSON.parse('<?php echo json_encode($marketing_sources) ?>');
+                    // SECURITY: Use wp_json_encode for safe JavaScript output
+                    let searchParams = <?php echo wp_json_encode($marketing_sources); ?>;
 
                     // console.log(searchParams)
 

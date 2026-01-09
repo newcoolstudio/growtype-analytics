@@ -41,6 +41,12 @@ class Growtype_Analytics_Admin_Settings
                 'value' => 'growtype_analytics_gtm_details',
                 'options' => [
                     [
+                        'title' => 'Enabled',
+                        'name' => 'enabled',
+                        'type' => 'checkbox',
+                        'default_value' => false
+                    ],
+                    [
                         'title' => 'GTM ID',
                         'name' => 'gtm_id',
                         'type' => 'input',
@@ -57,6 +63,30 @@ class Growtype_Analytics_Admin_Settings
                         'name' => 'ga4_id',
                         'type' => 'input',
                         'default_value' => ''
+                    ]
+                ]
+            ],
+            [
+                'name' => 'PostHog details',
+                'value' => 'growtype_analytics_posthog_details',
+                'options' => [
+                    [
+                        'title' => 'API Key',
+                        'name' => 'api_key',
+                        'type' => 'input',
+                        'default_value' => ''
+                    ],
+                    [
+                        'title' => 'Project ID',
+                        'name' => 'project_id',
+                        'type' => 'input',
+                        'default_value' => ''
+                    ],
+                    [
+                        'title' => 'Host URL',
+                        'name' => 'host',
+                        'type' => 'input',
+                        'default_value' => 'https://app.posthog.com'
                     ]
                 ]
             ]

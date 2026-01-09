@@ -13,6 +13,8 @@ class Growtype_Analytics_Tracking_Fb
          * Woocommerce
          */
         add_action('woocommerce_payment_complete', array ($this, 'woocommerce_payment_complete_extend'), 10, 4);
+        add_action('woocommerce_order_status_processing', array ($this, 'woocommerce_payment_complete_extend'), 10, 1);
+        add_action('woocommerce_order_status_completed', array ($this, 'woocommerce_payment_complete_extend'), 10, 1);
     }
 
     function set_fb_cookie_params()
@@ -22,14 +24,22 @@ class Growtype_Analytics_Tracking_Fb
         }
     }
 
-    function woocommerce_payment_complete_extend($order_id, $transaction_id)
+    function woocommerce_payment_complete_extend($order_id, $transaction_id = null)
     {
         $order = wc_get_order($order_id);
 
         if (!empty($order)) {
-            if (!in_array($order->get_status(), ['completed'])) {
+            if ($order->get_meta('_growtype_analytics_fb_purchase_tracked')) {
                 return;
             }
+
+            if (!in_array($order->get_status(), ['processing', 'completed'])) {
+                return;
+            }
+
+            // Mark as tracked before proceeding
+            $order->update_meta_data('_growtype_analytics_fb_purchase_tracked', 'yes');
+            $order->save();
 
             $order_items = $order->get_items();
             $value = $order->get_total();

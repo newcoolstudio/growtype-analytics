@@ -159,9 +159,15 @@ class Growtype_Analytics_Loader
         new Growtype_Analytics_Database();
 
         /**
-         * Crud
+         * Tracking
          */
         require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/tracking/Growtype_Analytics_Tracking.php';
         new Growtype_Analytics_Tracking();
+
+        /**
+         * REST API
+         */
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/api/Growtype_Analytics_Rest_Api.php';
+        new Growtype_Analytics_Rest_Api();
     }
 }

@@ -1,17 +1,17 @@
-import "./actions/growtypeAnalyticsPushToDataLayer";
+import "./actions/growtypeAnalyticsCapture";
 
 jQuery(document).ready(function ($) {
-    // blade attribute -> data-growtype-analytics-gtm='@json(["event" => "favourite_assistant", "value" => $post->post_name])'
+    // blade attribute -> data-growtype-analytics-tag='@json(["event" => "favourite_assistant", "value" => $post->post_name])'
     $('a,div,span,button').click(function () {
-        if (isGtmLoaded()) {
-            let value = $(this).attr('data-growtype-analytics-gtm');
+        let value = $(this).attr('data-growtype-analytics-tag');
 
-            if (value && value.length > 0) {
-                value = value.replace(/'/g, '"');
-                value = JSON.parse(value);
+        if (value && value.length > 0) {
+            value = value.replace(/'/g, '"');
+            value = JSON.parse(value);
 
-                window.dataLayer.push(value);
-            }
+            growtypeAnalyticsCapture('growtype_analytics_tag_click', {
+                value: value
+            });
         }
     });
 
@@ -19,11 +19,9 @@ jQuery(document).ready(function ($) {
      * Growtype quiz
      */
     document.addEventListener('growtypeQuizShowQuestion', function (params) {
-        if (isGtmLoaded() && params.detail.answer_details && params.detail.answer_details.answer) {
+        if (params.detail.answer_details && params.detail.answer_details.answer) {
             let answerDetails = params.detail.answer_details;
-            answerDetails.event = "quiz_question_answered";
-
-            window.dataLayer.push(answerDetails);
+            growtypeAnalyticsCapture('growtype_analytics_growtype_quiz_question_answer', answerDetails);
         }
     });
 
@@ -31,17 +29,11 @@ jQuery(document).ready(function ($) {
      * Growtype quiz finished
      */
     document.addEventListener('growtypeQuizSaveQuizData', function (event) {
-        if (isGtmLoaded() && event.detail?.answers) {
+        if (event.detail?.answers) {
             let answerDetails = {...event.detail.answers};
             answerDetails.event = "quiz_is_finished";
 
-            if (window.dataLayer && Array.isArray(window.dataLayer)) {
-                window.dataLayer.push(answerDetails);
-            } else {
-                console.warn("Growtype analytics - dataLayer is not available or not an array.");
-            }
-        } else {
-            console.warn("Growtype analytics - GTM is not loaded or event detail is missing answers.");
+            growtypeAnalyticsCapture('growtype_analytics_growtype_quiz_finished', answerDetails);
         }
     });
 
@@ -49,7 +41,7 @@ jQuery(document).ready(function ($) {
      * Growtype wc
      */
     document.addEventListener('growtypeWcPaymentFormLoaded', function (params) {
-        if (isGtmLoaded() && params.detail) {
+        if (params.detail) {
             let answerDetails = {
                 event: "add_payment_info",
                 ecommerce: {
@@ -61,37 +53,29 @@ jQuery(document).ready(function ($) {
                 }
             };
 
-            window.dataLayer.push(answerDetails);
+            growtypeAnalyticsCapture('growtype_analytics_growtype_wc_payment_form_loaded', answerDetails);
         }
     });
 
     jQuery('body').on('adding_to_cart', function () {
-        if (isGtmLoaded()) {
-            let answerDetails = {
-                event: "adding_to_cart",
-                value: window.growtype_wc_ajax.cart_total,
-                currency: window.growtype_wc_ajax.currency,
-                items: window.growtype_wc_ajax.items_gtm,
-                user_id: window.growtype_wc_ajax.user_id,
-                email: window.growtype_wc_ajax.email,
-            };
+        let answerDetails = {
+            event: "adding_to_cart",
+            value: window.growtype_wc_ajax.cart_total,
+            currency: window.growtype_wc_ajax.currency,
+            items: window.growtype_wc_ajax.items_gtm,
+            user_id: window.growtype_wc_ajax.user_id,
+            email: window.growtype_wc_ajax.email,
+        };
 
-            window.dataLayer.push(answerDetails);
-        }
+        growtypeAnalyticsCapture('growtype_analytics_growtype_wc_adding_to_cart', answerDetails);
     });
 
     jQuery('form.checkout').on('submit', function (event) {
-        if (isGtmLoaded()) {
-            let answerDetails = {
-                event: "payment_attempt",
-                payment_method: $('input[name="payment_method"]:checked').val()
-            };
+        let answerDetails = {
+            event: "payment_attempt",
+            payment_method: $('input[name="payment_method"]:checked').val()
+        };
 
-            window.dataLayer.push(answerDetails);
-        }
+        growtypeAnalyticsCapture('growtype_analytics_growtype_wc_checkout_form_submit', answerDetails);
     });
 });
-
-function isGtmLoaded() {
-    return window.dataLayer ? true : false;
-}

@@ -22,7 +22,7 @@
  * @link       http://example.com
  * @since      1.0.0
  *
- * @package    Growtype_Form
+ * @package    Growtype_Analytics
  */
 
 // If uninstall not called from WordPress, then exit.

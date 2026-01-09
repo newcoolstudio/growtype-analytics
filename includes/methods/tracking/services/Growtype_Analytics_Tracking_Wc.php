@@ -12,6 +12,8 @@ class Growtype_Analytics_Tracking_Wc
         $keys = [
             'source_type',       // source_type
 
+            'garef',       // growtype-affiliate ref
+
             // UTM Parameters (Standard)
             'utm_source',       // Referrer (e.g., google, facebook)
             'utm_medium',       // Marketing medium (e.g., cpc, email)
@@ -61,7 +63,18 @@ class Growtype_Analytics_Tracking_Wc
 
             foreach ($tracking_params as $tracking_param_key => $tracking_param_value) {
                 if (!empty($tracking_param_value)) {
-                    $order->update_meta_data('_wc_order_attribution_' . $tracking_param_key, $tracking_param_value);
+                    if (empty($tracking_params['utm_source'])) {
+
+                        if ($tracking_param_key === 'garef') {
+                            $tracking_param_key = 'utm';
+                            $tracking_param_value = 'garef=' . $tracking_param_value;
+                        }
+
+                        $order->update_meta_data('_wc_order_attribution_source_type', $tracking_param_key);
+                        $order->update_meta_data('_wc_order_attribution_utm_source', $tracking_param_value);
+                    } else {
+                        $order->update_meta_data('_wc_order_attribution_' . $tracking_param_key, $tracking_param_value);
+                    }
                 }
             }
         }, 10, 1);

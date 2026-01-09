@@ -94,9 +94,21 @@ class Growtype_Analytics_Admin
     private function load_methods()
     {
         /**
+         * Analytics Page
+         */
+        require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/Growtype_Analytics_Admin_Page.php';
+        new Growtype_Analytics_Admin_Page();
+
+        /**
          * Settings
          */
-        require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/settings/index.php';
-        $this->methods = new Growtype_Analytics_Admin_Settings();
+        require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/settings/Growtype_Analytics_Admin_Settings.php';
+        new Growtype_Analytics_Admin_Settings();
+
+        /**
+         * Users
+         */
+        require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/users/Growtype_Analytics_Admin_Users.php';
+        new Growtype_Analytics_Admin_Users();
     }
 }
