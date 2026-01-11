@@ -155,6 +155,60 @@ class Growtype_Analytics_Rest_Api_Docs
                     'top_10_custom_range'=> $base_url . '/chat/characters/popular?limit=10&start_date=2025-12-01&end_date=2025-12-31',
                 ),
             );
+            $docs['endpoints']['chat/conversations/buyers'] = array(
+                'url'         => $base_url . '/chat/conversations/buyers',
+                'method'      => 'GET',
+                'description' => __('Get recent chat conversations for users who have completed purchases. Used for analyzing high-intent behavior and successful conversion paths.', 'growtype-analytics'),
+                'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+                'parameters'  => array(
+                    'limit'          => __('Number of unique buyers to retrieve (default 10).', 'growtype-analytics'),
+                    'messages_limit' => __('Number of messages to retrieve per conversation (default 20).', 'growtype-analytics'),
+                ),
+                'response_format' => array(
+                    'metrics' => 'Includes current_credits, credits_spent, total_credits_bought, and total_spent_currency.',
+                    'notes'   => 'Automatically decrypts message content and excludes @talkiemate.com domain accounts.',
+                ),
+                'sample_queries' => array(
+                    'recent_10_buyers' => $base_url . '/chat/conversations/buyers',
+                    'deep_dive_5'      => $base_url . '/chat/conversations/buyers?limit=5&messages_limit=100',
+                ),
+            );
+            $docs['endpoints']['chat/conversations/non-buyers'] = array(
+                'url'         => $base_url . '/chat/conversations/non-buyers',
+                'method'      => 'GET',
+                'description' => __('Get recent chat conversations for registered users who have NOT made any purchases. Prioritizes highly active users to identify drops-offs and free-usage patterns (The Generosity Trap).', 'growtype-analytics'),
+                'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+                'parameters'  => array(
+                    'limit'          => __('Number of unique non-buyers to retrieve (default 10).', 'growtype-analytics'),
+                    'messages_limit' => __('Number of messages to retrieve per conversation (default 20).', 'growtype-analytics'),
+                ),
+                'response_format' => array(
+                    'metrics' => 'Includes current_credits, credits_spent, and lifetime_messages.',
+                    'notes'   => 'Automatically decrypts message content and excludes @talkiemate.com domain accounts.',
+                ),
+                'sample_queries' => array(
+                    'active_non_buyers' => $base_url . '/chat/conversations/non-buyers',
+                    'friction_analysis' => $base_url . '/chat/conversations/non-buyers?limit=20&messages_limit=50',
+                ),
+            );
+            $docs['endpoints']['chat/conversations/newest'] = array(
+                'url'         => $base_url . '/chat/conversations/newest',
+                'method'      => 'GET',
+                'description' => __('Get recent chat conversations for the newest registered users, combining both buyers and non-buyers. Perfect for a "Live Feed" of current traffic activity.', 'growtype-analytics'),
+                'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+                'parameters'  => array(
+                    'limit'          => __('Number of unique users to retrieve (default 10, max 100).', 'growtype-analytics'),
+                    'messages_limit' => __('Number of messages to retrieve per conversation (default 20).', 'growtype-analytics'),
+                ),
+                'response_format' => array(
+                    'metrics' => 'Includes current_credits, credits_spent, total_credits_bought, total_spent_currency, and purchase_attempts.',
+                    'notes'   => 'Prioritizes by newest registration date. Automatically decrypts message content and excludes squad team accounts.',
+                ),
+                'sample_queries' => array(
+                    'live_feed_10'   => $base_url . '/chat/conversations/newest',
+                    'deep_audit_100' => $base_url . '/chat/conversations/newest?limit=100&messages_limit=50',
+                ),
+            );
         }
 
         if (class_exists('WooCommerce')) {
