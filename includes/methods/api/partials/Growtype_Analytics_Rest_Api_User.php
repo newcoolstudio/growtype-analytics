@@ -60,6 +60,13 @@ class Growtype_Analytics_Rest_Api_User
                         'format'      => 'date',
                         'required'    => false,
                     ),
+                    'limit' => array(
+                        'description' => __('Maximum number of users to return (default: 100 when no period specified).', 'growtype-analytics'),
+                        'type'        => 'integer',
+                        'minimum'     => 1,
+                        'maximum'     => 1000,
+                        'required'    => false,
+                    ),
                 ),
             ),
         ));
@@ -126,10 +133,14 @@ class Growtype_Analytics_Rest_Api_User
     {
         global $wpdb;
 
+        // Default limit for users when no period is specified
+        $default_limit = 10;
+
         $period = $request->get_param('period');
         // Support both date_from/date_to and start_date/end_date
         $start_date = $request->get_param('date_from') ?: $request->get_param('start_date');
         $end_date = $request->get_param('date_to') ?: $request->get_param('end_date');
+        $limit = $request->get_param('limit');
 
         if (!empty($period)) {
             switch ($period) {
@@ -169,6 +180,13 @@ class Growtype_Analytics_Rest_Api_User
 
         $query .= " ORDER BY user_registered DESC";
 
+        // Apply limit if specified or if no period is specified
+        if (!empty($limit)) {
+            $query .= " LIMIT " . intval($limit);
+        } elseif (empty($period) && empty($start_date) && empty($end_date)) {
+            $query .= " LIMIT " . $default_limit;
+        }
+
         $users = $wpdb->get_results($query);
 
         return new WP_REST_Response(array(
@@ -176,6 +194,7 @@ class Growtype_Analytics_Rest_Api_User
             'period'     => $period,
             'start_date' => $start_date,
             'end_date'   => $end_date,
+            'limit'      => $limit ?: (empty($period) && empty($start_date) && empty($end_date) ? $default_limit : null),
         ), 200);
     }
 

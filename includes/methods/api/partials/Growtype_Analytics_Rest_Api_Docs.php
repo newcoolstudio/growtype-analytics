@@ -340,6 +340,85 @@ class Growtype_Analytics_Rest_Api_Docs
             );
         }
 
+        if (class_exists('Growtype_Quiz')) {
+            $docs['endpoints']['quiz/results'] = array(
+                'url'         => $base_url . '/quiz/results',
+                'method'      => 'GET',
+                'description' => __('Get quiz results based on quiz_id or quiz_slug.', 'growtype-analytics'),
+                'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+                'parameters'  => array(
+                    'quiz_id'   => __('Filter by specific quiz ID.', 'growtype-analytics'),
+                    'quiz_slug' => __('Filter by specific quiz slug.', 'growtype-analytics'),
+                    'limit'     => __('Number of results to retrieve (default 20).', 'growtype-analytics'),
+                ),
+                'sample_queries' => array(
+                    'by_id'   => $base_url . '/quiz/results?quiz_id=123',
+                    'by_slug' => $base_url . '/quiz/results?quiz_slug=my-awesome-quiz',
+                ),
+            );
+        }
+
+        if (class_exists('WooCommerce')) {
+            $docs['endpoints']['payments/gateways'] = array(
+                'url'         => $base_url . '/payments/gateways',
+                'method'      => 'GET',
+                'description' => __('Get distribution of orders and revenue by payment gateway.', 'growtype-analytics'),
+                'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+                'parameters'  => array(
+                    'period'     => array('week', 'month', 'year', 'all'),
+                    'start_date' => 'YYYY-MM-DD',
+                    'end_date'   => 'YYYY-MM-DD',
+                ),
+                'sample_queries' => array(
+                    'gateways_this_month' => $base_url . '/payments/gateways?period=month',
+                ),
+            );
+            $docs['endpoints']['payments/failures'] = array(
+                'url'         => $base_url . '/payments/failures',
+                'method'      => 'GET',
+                'description' => __('Get failed payment statistics grouped by gateway.', 'growtype-analytics'),
+                'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+                'parameters'  => array(
+                    'period' => array('week', 'month', 'year', 'all'),
+                ),
+                'sample_queries' => array(
+                    'failures_this_month' => $base_url . '/payments/failures?period=month',
+                ),
+            );
+            $docs['endpoints']['payments/success-rate'] = array(
+                'url'         => $base_url . '/payments/success-rate',
+                'method'      => 'GET',
+                'description' => __('Get payment success rate (Completed vs Failed/Cancelled).', 'growtype-analytics'),
+                'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+                'parameters'  => array(
+                    'period'     => array('week', 'month', 'year', 'all'),
+                    'start_date' => 'YYYY-MM-DD',
+                    'end_date'   => 'YYYY-MM-DD',
+                ),
+                'sample_queries' => array(
+                    'success_rate_month' => $base_url . '/payments/success-rate?period=month',
+                ),
+            );
+        }
+
+        if (class_exists('Growtype_Chat') && class_exists('WooCommerce')) {
+            $docs['endpoints']['characters/revenue'] = array(
+                'url'         => $base_url . '/characters/revenue',
+                'method'      => 'GET',
+                'description' => __('Get revenue attribution for characters based on the last message before purchase.', 'growtype-analytics'),
+                'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+                'parameters'  => array(
+                    'period'     => array('week', 'month', 'year', 'all'),
+                    'start_date' => 'YYYY-MM-DD',
+                    'end_date'   => 'YYYY-MM-DD',
+                    'limit'      => __('Limit the number of top characters to retrieve.', 'growtype-analytics'),
+                ),
+                'sample_queries' => array(
+                    'revenue_top_10' => $base_url . '/characters/revenue?period=month&limit=10',
+                ),
+            );
+        }
+
         return new WP_REST_Response($docs, 200);
     }
 }

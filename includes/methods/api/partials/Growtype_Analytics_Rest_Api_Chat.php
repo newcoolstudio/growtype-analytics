@@ -4,6 +4,7 @@
  * Growtype Analytics REST API Chat Partial
  *
  * Handles REST API routes for chat-related data.
+ * NOTE: This partial requires the 'growtype-chat' plugin to be active.
  *
  * @package    Growtype_Analytics
  * @subpackage growtype_analytics/includes/methods/api/partials

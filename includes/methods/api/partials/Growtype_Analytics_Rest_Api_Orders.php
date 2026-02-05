@@ -4,12 +4,13 @@
  * Growtype Analytics REST API WooCommerce Partial
  *
  * Handles REST API routes for WooCommerce-related data.
+ * NOTE: This partial requires the 'WooCommerce' plugin to be active.
  *
  * @package    Growtype_Analytics
  * @subpackage growtype_analytics/includes/methods/api/partials
  */
 
-class Growtype_Analytics_Rest_Api_Woocommerce
+class Growtype_Analytics_Rest_Api_Orders
 {
     /**
      * Initialize the class and set its properties.

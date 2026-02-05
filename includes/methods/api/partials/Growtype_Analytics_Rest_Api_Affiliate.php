@@ -4,6 +4,7 @@
  * Growtype Analytics REST API Affiliate Partial
  *
  * Handles REST API routes for affiliate-related data.
+ * NOTE: This partial requires the 'growtype-affiliate' plugin to be active.
  *
  * @package    Growtype_Analytics
  * @subpackage growtype_analytics/includes/methods/api/partials
