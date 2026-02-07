@@ -192,14 +192,18 @@ class Growtype_Analytics_Rest_Api_Characters
             if (!empty($char_ids)) {
                 $placeholders = implode(',', array_fill(0, count($char_ids), '%s'));
                 $char_info = $wpdb->get_results($wpdb->prepare(
-                    "SELECT external_id, slug, name FROM $characters_table WHERE external_id IN ($placeholders)",
+                    "SELECT external_id, slug, metadata FROM $characters_table WHERE external_id IN ($placeholders)",
                     ...$char_ids
                 ));
 
                 foreach ($char_info as $info) {
                     if (isset($top_chars[$info->external_id])) {
                         $top_chars[$info->external_id]['slug'] = $info->slug;
-                        $top_chars[$info->external_id]['name'] = $info->name;
+                        
+                        $metadata = json_decode($info->metadata, true);
+                        if (!empty($metadata) && isset($metadata['details']['character_title'])) {
+                            $top_chars[$info->external_id]['name'] = $metadata['details']['character_title'];
+                        }
                     }
                 }
             }
