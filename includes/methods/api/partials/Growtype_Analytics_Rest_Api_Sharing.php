@@ -36,6 +36,10 @@ class Growtype_Analytics_Rest_Api_Sharing
                     'default' => 'json',
                     'sanitize_callback' => array($this, 'sanitize_content_format'),
                 ),
+                'clear_cache' => array(
+                    'default' => false,
+                    'sanitize_callback' => array($this, 'sanitize_clear_cache'),
+                ),
             ),
         ));
     }
@@ -47,14 +51,29 @@ class Growtype_Analytics_Rest_Api_Sharing
         return in_array($value, array('json', 'html'), true) ? $value : 'json';
     }
 
+    public function sanitize_clear_cache($value)
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        $value = strtolower((string)$value);
+        return in_array($value, array('1', 'true', 'yes', 'y', 'on'), true);
+    }
+
     public function get_shared_report(WP_REST_Request $request)
     {
         $token = sanitize_text_field($request->get_param('token'));
         $content_format = $this->sanitize_content_format($request->get_param('content_format'));
+        $clear_cache = $this->sanitize_clear_cache($request->get_param('clear_cache'));
         $matched_link = $this->find_share_link($token);
 
         if (empty($matched_link)) {
             return new WP_Error('growtype_analytics_invalid_share_link', __('Invalid shared analytics access URL.', 'growtype-analytics'), array('status' => 404));
+        }
+
+        if ($clear_cache) {
+            $this->clear_analytics_transients();
         }
 
         if (!class_exists('Growtype_Analytics_Admin_Page')) {
@@ -80,6 +99,36 @@ class Growtype_Analytics_Rest_Api_Sharing
         $response->header('X-Robots-Tag', 'noindex, nofollow');
         
         return $response;
+    }
+
+    private function clear_analytics_transients()
+    {
+        global $wpdb;
+
+        $like_patterns = array(
+            '_transient_growtype_analytics_%',
+            '_transient_timeout_growtype_analytics_%',
+            '_site_transient_growtype_analytics_%',
+            '_site_transient_timeout_growtype_analytics_%',
+        );
+
+        foreach ($like_patterns as $pattern) {
+            $wpdb->query(
+                $wpdb->prepare(
+                    "DELETE FROM `{$wpdb->options}` WHERE option_name LIKE %s",
+                    $pattern
+                )
+            );
+
+            if (is_multisite()) {
+                $wpdb->query(
+                    $wpdb->prepare(
+                        "DELETE FROM `{$wpdb->sitemeta}` WHERE meta_key LIKE %s",
+                        $pattern
+                    )
+                );
+            }
+        }
     }
 
     private function find_share_link($token)

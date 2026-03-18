@@ -364,26 +364,26 @@ class Growtype_Analytics_Admin_Metrics
         $paid_placeholders = implode(',', array_fill(0, count($settings['paid_statuses']), '%s'));
         $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
 
-        // Single query: get buyer count, recurring buyer count and total revenue in one scan
         $query = "SELECT
-                COUNT(DISTINCT pm.meta_value) as buyers,
-                SUM(DISTINCT CASE WHEN order_counts.order_cnt > 1 THEN 1 ELSE 0 END) as recurring_buyers,
-                SUM(CAST(total.meta_value AS DECIMAL(10,2))) as total_revenue
-            FROM `{$wpdb->postmeta}` pm
-            INNER JOIN `{$wpdb->posts}` p ON p.ID = pm.post_id
-            INNER JOIN `{$wpdb->users}` u ON u.ID = pm.meta_value
-            LEFT JOIN `{$wpdb->postmeta}` total ON total.post_id = p.ID AND total.meta_key = '_order_total'
-            LEFT JOIN (
-                SELECT meta_value, COUNT(DISTINCT post_id) as order_cnt
-                FROM `{$wpdb->postmeta}`
-                WHERE meta_key = '_customer_user' AND meta_value > 0
-                GROUP BY meta_value
-            ) order_counts ON order_counts.meta_value = pm.meta_value
-            WHERE pm.meta_key = '_customer_user'
-            AND pm.meta_value > 0
-            AND p.post_type = 'shop_order'
-            AND p.post_status IN ($paid_placeholders)
-            {$email_exclusion['sql']}";
+                COUNT(*) as buyers,
+                SUM(CASE WHEN buyer_orders.order_cnt > 1 THEN 1 ELSE 0 END) as recurring_buyers,
+                SUM(buyer_orders.total_revenue) as total_revenue
+            FROM (
+                SELECT
+                    pm.meta_value as user_id,
+                    COUNT(DISTINCT p.ID) as order_cnt,
+                    SUM(CAST(total.meta_value AS DECIMAL(10,2))) as total_revenue
+                FROM `{$wpdb->postmeta}` pm
+                INNER JOIN `{$wpdb->posts}` p ON p.ID = pm.post_id
+                INNER JOIN `{$wpdb->users}` u ON u.ID = pm.meta_value
+                LEFT JOIN `{$wpdb->postmeta}` total ON total.post_id = p.ID AND total.meta_key = '_order_total'
+                WHERE pm.meta_key = '_customer_user'
+                AND pm.meta_value > 0
+                AND p.post_type = 'shop_order'
+                AND p.post_status IN ($paid_placeholders)
+                {$email_exclusion['sql']}
+                GROUP BY pm.meta_value
+            ) buyer_orders";
 
         $row = $wpdb->get_row(
             $this->prepare_dynamic_query($query, array_merge($settings['paid_statuses'], $email_exclusion['params'])),
@@ -496,56 +496,68 @@ class Growtype_Analytics_Admin_Metrics
         global $wpdb;
 
         $paid_placeholders = implode(',', array_fill(0, count($settings['paid_statuses']), '%s'));
-        $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
+        $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns'], true);
+        $recent_payer_window_days = max(1, (int)$settings['recent_payer_window_days']);
+        $churn_inactivity_days = max(1, (int)$settings['churn_inactivity_days']);
 
-        // Count unique payers in previous 30d (days 31-60 ago)
-        $prev_query = "SELECT COUNT(DISTINCT pm.meta_value)
+        $recent_query = "SELECT COUNT(DISTINCT pm.meta_value)
             FROM `{$wpdb->postmeta}` pm
             INNER JOIN `{$wpdb->posts}` p ON p.ID = pm.post_id
-            INNER JOIN `{$wpdb->users}` u ON u.ID = pm.meta_value
+            LEFT JOIN `{$wpdb->users}` u ON u.ID = pm.meta_value
             WHERE pm.meta_key = '_customer_user' AND pm.meta_value > 0
             AND p.post_type = 'shop_order'
             AND p.post_status IN ($paid_placeholders)
-            AND p.post_date >= DATE_SUB(NOW(), INTERVAL 60 DAY)
-            AND p.post_date < DATE_SUB(NOW(), INTERVAL 30 DAY)
+            AND p.post_date >= DATE_SUB(NOW(), INTERVAL %d DAY)
             {$email_exclusion['sql']}";
-        $prev_payers = (int)$wpdb->get_var(
-            $this->prepare_dynamic_query($prev_query, array_merge($settings['paid_statuses'], $email_exclusion['params']))
+
+        $recent_payers = (int)$wpdb->get_var(
+            $this->prepare_dynamic_query(
+                $recent_query,
+                array_merge($settings['paid_statuses'], array($recent_payer_window_days), $email_exclusion['params'])
+            )
         );
 
-        if ($prev_payers === 0) {
+        if ($recent_payers === 0) {
             return 0;
         }
 
-        // Count how many of those prev payers also paid in current 30d
-        $retained_query = "SELECT COUNT(DISTINCT prev.meta_value)
-            FROM `{$wpdb->postmeta}` prev
-            INNER JOIN `{$wpdb->posts}` pp ON pp.ID = prev.post_id
-            INNER JOIN `{$wpdb->users}` u ON u.ID = prev.meta_value
-            WHERE prev.meta_key = '_customer_user' AND prev.meta_value > 0
-            AND pp.post_type = 'shop_order'
-            AND pp.post_status IN ($paid_placeholders)
-            AND pp.post_date >= DATE_SUB(NOW(), INTERVAL 60 DAY)
-            AND pp.post_date < DATE_SUB(NOW(), INTERVAL 30 DAY)
-            AND EXISTS (
-                SELECT 1 FROM `{$wpdb->postmeta}` cur
-                INNER JOIN `{$wpdb->posts}` cp ON cp.ID = cur.post_id
-                WHERE cur.meta_key = '_customer_user'
-                AND cur.meta_value = prev.meta_value
-                AND cp.post_type = 'shop_order'
-                AND cp.post_status IN ($paid_placeholders)
-                AND cp.post_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        $inactive_query = "SELECT COUNT(DISTINCT pm.meta_value)
+            FROM `{$wpdb->postmeta}` pm
+            INNER JOIN `{$wpdb->posts}` p ON p.ID = pm.post_id
+            LEFT JOIN `{$wpdb->users}` u ON u.ID = pm.meta_value
+            WHERE pm.meta_key = '_customer_user' AND pm.meta_value > 0
+            AND p.post_type = 'shop_order'
+            AND p.post_status IN ($paid_placeholders)
+            AND p.post_date >= DATE_SUB(NOW(), INTERVAL %d DAY)
+            AND NOT EXISTS (
+                SELECT 1
+                FROM `{$wpdb->prefix}growtype_chat_messages` m
+                INNER JOIN `{$wpdb->prefix}growtype_chat_users` cu ON cu.id = m.user_id
+                WHERE cu.external_id = pm.meta_value
+                AND cu.type = 'wp_user'
+                AND m.created_at >= DATE_SUB(NOW(), INTERVAL %d DAY)
             )
             {$email_exclusion['sql']}";
-        $retained = (int)$wpdb->get_var(
+
+        if (
+            !$this->controller->table_exists($wpdb->prefix . 'growtype_chat_messages') ||
+            !$this->controller->table_exists($wpdb->prefix . 'growtype_chat_users')
+        ) {
+            return 0;
+        }
+
+        $inactive_recent_payers = (int)$wpdb->get_var(
             $this->prepare_dynamic_query(
-                $retained_query,
-                array_merge($settings['paid_statuses'], $settings['paid_statuses'], $email_exclusion['params'])
+                $inactive_query,
+                array_merge(
+                    $settings['paid_statuses'],
+                    array($recent_payer_window_days, $churn_inactivity_days),
+                    $email_exclusion['params']
+                )
             )
         );
 
-        $churned = $prev_payers - $retained;
-        return round(($churned / $prev_payers) * 100, 2);
+        return round(($inactive_recent_payers / $recent_payers) * 100, 2);
     }
 
     /**
@@ -564,39 +576,41 @@ class Growtype_Analytics_Admin_Metrics
         }
 
         $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
+        $churn_inactivity_days = max(1, (int)$settings['churn_inactivity_days']);
 
-        // Single query: count prev MAU and retained MAU together
-        $query = "SELECT
-                COUNT(DISTINCT cu.external_id) as prev_mau,
-                COUNT(DISTINCT CASE
-                    WHEN EXISTS (
-                        SELECT 1 FROM `{$chat_messages_table}` m2
-                        INNER JOIN `{$chat_users_table}` cu2 ON cu2.id = m2.user_id
-                        WHERE cu2.external_id = cu.external_id AND cu2.type = 'wp_user'
-                        AND m2.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                    ) THEN cu.external_id
-                END) as retained_mau
+        $active_30_query = "SELECT COUNT(DISTINCT cu.external_id)
             FROM `{$chat_messages_table}` m
             INNER JOIN `{$chat_users_table}` cu ON cu.id = m.user_id AND cu.type = 'wp_user'
             INNER JOIN `{$wpdb->users}` u ON u.ID = cu.external_id
             WHERE cu.external_id > 0
-            AND m.created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
-            AND m.created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
+            AND m.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
             {$email_exclusion['sql']}";
 
-        $row = $wpdb->get_row(
-            $this->prepare_dynamic_query($query, $email_exclusion['params']),
-            ARRAY_A
+        $active_30d = (int)$wpdb->get_var(
+            $this->prepare_dynamic_query($active_30_query, $email_exclusion['params'])
         );
 
-        $prev_mau = (int)($row['prev_mau'] ?? 0);
-        $retained = (int)($row['retained_mau'] ?? 0);
-
-        if ($prev_mau === 0) {
+        if ($active_30d === 0) {
             return 0;
         }
 
-        return round((($prev_mau - $retained) / $prev_mau) * 100, 2);
+        $active_recent_query = "SELECT COUNT(DISTINCT cu.external_id)
+            FROM `{$chat_messages_table}` m
+            INNER JOIN `{$chat_users_table}` cu ON cu.id = m.user_id AND cu.type = 'wp_user'
+            INNER JOIN `{$wpdb->users}` u ON u.ID = cu.external_id
+            WHERE cu.external_id > 0
+            AND m.created_at >= DATE_SUB(NOW(), INTERVAL %d DAY)
+            {$email_exclusion['sql']}";
+
+        $active_recent = (int)$wpdb->get_var(
+            $this->prepare_dynamic_query(
+                $active_recent_query,
+                array_merge(array($churn_inactivity_days), $email_exclusion['params'])
+            )
+        );
+
+        $inactive_recent = max(0, $active_30d - $active_recent);
+        return round(($inactive_recent / $active_30d) * 100, 2);
     }
 
     /**
@@ -1428,6 +1442,7 @@ class Growtype_Analytics_Admin_Metrics
         $registrations = $this->get_registration_trend_daily($days, $settings);
         $paid_orders = $this->get_paid_orders_trend_daily($days, $settings);
         $revenue = $this->get_revenue_trend_daily($days, $settings);
+        $buyer_conversion = $this->get_registration_cohort_conversion_daily($days, $settings, 7);
 
         $rows_by_date = array();
 
@@ -1446,18 +1461,24 @@ class Growtype_Analytics_Admin_Metrics
             $rows_by_date[$row['date']]['revenue'] = $row['amount'];
         }
 
+        foreach ($buyer_conversion as $row) {
+            $rows_by_date[$row['date']]['date'] = $row['date'];
+            $rows_by_date[$row['date']]['buyers_within_window'] = $row['buyers_within_window'];
+            $rows_by_date[$row['date']]['conversion_rate'] = $row['conversion_rate'];
+        }
+
         ksort($rows_by_date);
 
         $formatted = array();
         foreach ($rows_by_date as $date => $row) {
-            $registrations_count = (int)($row['registrations'] ?? 0);
-            $paid_order_count = (int)($row['paid_orders'] ?? 0);
             $formatted[] = array(
                 'date' => $date,
-                'registrations' => $registrations_count,
-                'paid_orders' => $paid_order_count,
+                'registrations' => (int)($row['registrations'] ?? 0),
+                'paid_orders' => (int)($row['paid_orders'] ?? 0),
                 'revenue' => round((float)($row['revenue'] ?? 0), 2),
-                'conversion_rate' => $registrations_count > 0 ? round(($paid_order_count / $registrations_count) * 100, 2) : 0,
+                'buyers_within_window' => (int)($row['buyers_within_window'] ?? 0),
+                'conversion_rate' => round((float)($row['conversion_rate'] ?? 0), 2),
+                'conversion_window_days' => 7,
             );
         }
 
@@ -1668,6 +1689,57 @@ class Growtype_Analytics_Admin_Metrics
             $daily[] = array(
                 'date' => $row['order_date'],
                 'count' => (int)$row['paid_orders'],
+            );
+        }
+
+        return $daily;
+    }
+
+    private function get_registration_cohort_conversion_daily($days, $settings, $window_days = 7)
+    {
+        global $wpdb;
+
+        $paid_placeholders = implode(',', array_fill(0, count($settings['paid_statuses']), '%s'));
+        $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
+
+        $query = "SELECT
+                DATE(u.user_registered) as cohort_date,
+                COUNT(DISTINCT u.ID) as registrations,
+                COUNT(DISTINCT CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM `{$wpdb->postmeta}` pm
+                        INNER JOIN `{$wpdb->posts}` p ON p.ID = pm.post_id
+                        WHERE pm.meta_key = '_customer_user'
+                        AND pm.meta_value = u.ID
+                        AND p.post_type = 'shop_order'
+                        AND p.post_status IN ($paid_placeholders)
+                        AND p.post_date >= u.user_registered
+                        AND p.post_date < DATE_ADD(u.user_registered, INTERVAL %d DAY)
+                    ) THEN u.ID
+                END) as buyers_within_window
+            FROM `{$wpdb->users}` u
+            WHERE u.user_registered >= DATE_SUB(NOW(), INTERVAL %d DAY)
+            {$email_exclusion['sql']}
+            GROUP BY cohort_date
+            ORDER BY cohort_date ASC";
+
+        $params = array_merge(
+            $settings['paid_statuses'],
+            array((int)$window_days, (int)$days),
+            $email_exclusion['params']
+        );
+
+        $results = $wpdb->get_results($this->prepare_dynamic_query($query, $params), ARRAY_A);
+
+        $daily = array();
+        foreach ($results ?: array() as $row) {
+            $registrations = (int)$row['registrations'];
+            $buyers_within_window = (int)$row['buyers_within_window'];
+            $daily[] = array(
+                'date' => $row['cohort_date'],
+                'buyers_within_window' => $buyers_within_window,
+                'conversion_rate' => $registrations > 0 ? round(($buyers_within_window / $registrations) * 100, 2) : 0,
             );
         }
 

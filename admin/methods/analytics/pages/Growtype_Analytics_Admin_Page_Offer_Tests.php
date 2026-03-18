@@ -2,7 +2,7 @@
 
 class Growtype_Analytics_Admin_Page_Offer_Tests extends Growtype_Analytics_Admin_Base_Page
 {
-    public function get_offer_test_rows($limit = 50)
+    public function get_offer_test_rows($limit = 50, $days = 30)
     {
         global $wpdb;
 
@@ -34,12 +34,13 @@ class Growtype_Analytics_Admin_Page_Offer_Tests extends Growtype_Analytics_Admin
             LEFT JOIN `{$wpdb->users}` u ON customer.meta_value = u.ID
             WHERE p.post_type = 'shop_order'
             AND p.post_status IN ($attempt_placeholders)
+            AND p.post_date >= DATE_SUB(NOW(), INTERVAL %d DAY)
             {$email_exclusion['sql']}
             GROUP BY oi.order_item_name
             ORDER BY revenue DESC, paid_orders DESC
             LIMIT %d";
 
-        $params = array_merge($paid, $failed, $paid, $attempts, $email_exclusion['params'], array((int)$limit));
+        $params = array_merge($paid, $failed, $paid, $attempts, array((int)$days), $email_exclusion['params'], array((int)$limit));
         $results = $wpdb->get_results($this->controller->prepare_dynamic_query($query, $params), ARRAY_A);
 
         return array_map(function ($row) {
@@ -82,7 +83,7 @@ class Growtype_Analytics_Admin_Page_Offer_Tests extends Growtype_Analytics_Admin
         ?>
         <div class="analytics-section">
             <h2><?php _e('Offer Performance', 'growtype-analytics'); ?></h2>
-            <p class="description"><?php _e('Ranks product packs by paid orders, failed attempts, success rate, and revenue.', 'growtype-analytics'); ?></p>
+            <p class="description"><?php _e('Ranks product packs by paid orders, failed attempts, success rate, and revenue in the last 30 days.', 'growtype-analytics'); ?></p>
             <?php
             $this->controller->decision_renderer->render_growth_table(
                 array('Offer', 'Paid Orders', 'Failed Attempts', 'Success Rate', 'Revenue', 'Avg Revenue / Order'),

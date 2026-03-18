@@ -30,6 +30,7 @@ class Growtype_Analytics_Admin_Page_Contribution_Margin extends Growtype_Analyti
         $revenue_share_cost = $revenue * ($margin_settings['revenue_share_percent'] / 100);
         $infra_cost = $margin_settings['monthly_infra_cost'] * ($days / 30);
         $contribution_margin = $revenue - $payment_fees - $ai_cost - $media_cost - $revenue_share_cost - $infra_cost;
+        $margin_quality = $this->get_margin_quality($margin_settings);
 
         return array(
             'revenue' => $revenue,
@@ -40,6 +41,7 @@ class Growtype_Analytics_Admin_Page_Contribution_Margin extends Growtype_Analyti
             'infra_cost' => $infra_cost,
             'contribution_margin' => $contribution_margin,
             'contribution_margin_percent' => $revenue > 0 ? ($contribution_margin / $revenue) * 100 : 0,
+            'quality' => $margin_quality,
         );
     }
 
@@ -57,6 +59,8 @@ class Growtype_Analytics_Admin_Page_Contribution_Margin extends Growtype_Analyti
                 array('Estimated Media Cost', $this->controller->format_money($metrics['media_cost'])),
                 array('Estimated Revenue Share', $this->controller->format_money($metrics['revenue_share_cost'])),
                 array('Estimated Infra Cost', $this->controller->format_money($metrics['infra_cost'])),
+                array('Margin Estimate Confidence', strtoupper($metrics['quality']['confidence'])),
+                array('Missing Inputs', !empty($metrics['quality']['missing_inputs']) ? implode(', ', $metrics['quality']['missing_inputs']) : 'None'),
                 array('Contribution Margin', $this->controller->format_money($metrics['contribution_margin'])),
                 array('Contribution Margin %', $this->controller->format_percent($metrics['contribution_margin_percent'])),
             ),
@@ -111,6 +115,7 @@ class Growtype_Analytics_Admin_Page_Contribution_Margin extends Growtype_Analyti
                 'media_cost' => $metrics['media_cost'],
                 'revenue_share_cost' => $metrics['revenue_share_cost'],
                 'infra_cost' => $metrics['infra_cost'],
+                'quality' => $metrics['quality'],
                 'refund_orders' => $refunds['refund_orders'],
                 'refund_amount' => $refunds['refund_amount'],
                 'known_chargeback_count' => $chargeback_count,
@@ -125,6 +130,8 @@ class Growtype_Analytics_Admin_Page_Contribution_Margin extends Growtype_Analyti
                 array('Media Cost', $this->controller->format_money($metrics['media_cost'])),
                 array('Revenue Share', $this->controller->format_money($metrics['revenue_share_cost'])),
                 array('Infra Cost', $this->controller->format_money($metrics['infra_cost'])),
+                array('Margin Estimate Confidence', strtoupper($metrics['quality']['confidence'])),
+                array('Missing Inputs', !empty($metrics['quality']['missing_inputs']) ? implode(', ', $metrics['quality']['missing_inputs']) : 'None'),
                 array('Refund Orders 30d', $this->controller->format_number($refunds['refund_orders'])),
                 array('Refund Amount 30d', $this->controller->format_money($refunds['refund_amount'])),
                 array('Known Chargebacks 30d', $this->controller->format_number($chargeback_count)),
@@ -132,6 +139,43 @@ class Growtype_Analytics_Admin_Page_Contribution_Margin extends Growtype_Analyti
                 array('Net After Refunds & Chargebacks', $this->controller->format_money($net_after_refunds)),
                 array('Net Margin %', $this->controller->format_percent($net_margin_percent)),
             ),
+        );
+    }
+
+    private function get_margin_quality($margin_settings)
+    {
+        $tracked_inputs = array(
+            'ai_cost_per_active_user' => __('AI cost', 'growtype-analytics'),
+            'media_cost_per_paid_order' => __('Media cost', 'growtype-analytics'),
+            'revenue_share_percent' => __('Revenue share', 'growtype-analytics'),
+            'monthly_infra_cost' => __('Infra cost', 'growtype-analytics'),
+        );
+
+        $missing_inputs = array();
+        $configured_inputs = 0;
+
+        foreach ($tracked_inputs as $key => $label) {
+            if ((float)($margin_settings[$key] ?? 0) > 0) {
+                $configured_inputs++;
+            } else {
+                $missing_inputs[] = $label;
+            }
+        }
+
+        $coverage_percent = round(($configured_inputs / count($tracked_inputs)) * 100, 2);
+
+        if ($coverage_percent >= 75) {
+            $confidence = 'high';
+        } elseif ($coverage_percent >= 50) {
+            $confidence = 'medium';
+        } else {
+            $confidence = 'low';
+        }
+
+        return array(
+            'coverage_percent' => $coverage_percent,
+            'confidence' => $confidence,
+            'missing_inputs' => $missing_inputs,
         );
     }
 

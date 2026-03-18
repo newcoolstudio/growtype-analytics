@@ -2,7 +2,7 @@
 
 class Growtype_Analytics_Admin_Page_Source_Attribution extends Growtype_Analytics_Admin_Base_Page
 {
-    public function get_source_attribution_rows($limit = 50)
+    public function get_source_attribution_rows($limit = 50, $days = 30)
     {
         global $wpdb;
 
@@ -29,12 +29,13 @@ class Growtype_Analytics_Admin_Page_Source_Attribution extends Growtype_Analytic
             LEFT JOIN `{$wpdb->postmeta}` campaign ON campaign.post_id = p.ID AND campaign.meta_key = '_wc_order_attribution_utm_campaign'
             WHERE p.post_type = 'shop_order'
             AND p.post_status IN ($attempt_placeholders)
+            AND p.post_date >= DATE_SUB(NOW(), INTERVAL %d DAY)
             {$email_exclusion['sql']}
             GROUP BY source_type, source, campaign
             ORDER BY revenue DESC, attempts DESC
             LIMIT %d";
 
-        $params = array_merge($paid, $paid, $attempts, $email_exclusion['params'], array((int)$limit));
+        $params = array_merge($paid, $paid, $attempts, array((int)$days), $email_exclusion['params'], array((int)$limit));
         $results = $wpdb->get_results($this->controller->prepare_dynamic_query($query, $params), ARRAY_A);
 
         return array_map(function ($row) {
@@ -78,7 +79,7 @@ class Growtype_Analytics_Admin_Page_Source_Attribution extends Growtype_Analytic
         ?>
         <div class="analytics-section">
             <h2><?php _e('Revenue By Source', 'growtype-analytics'); ?></h2>
-            <p class="description"><?php _e('Shows which traffic sources and campaigns create paid orders, attempts, and revenue.', 'growtype-analytics'); ?></p>
+            <p class="description"><?php _e('Shows which traffic sources and campaigns create paid orders, attempts, and revenue in the last 30 days.', 'growtype-analytics'); ?></p>
             <?php
             $this->controller->decision_renderer->render_growth_table(
                 array('Source Type', 'Source', 'Campaign', 'Paid Orders', 'Attempts', 'Success Rate', 'Revenue', 'AOV'),

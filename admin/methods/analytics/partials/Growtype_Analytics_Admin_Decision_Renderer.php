@@ -53,8 +53,8 @@ class Growtype_Analytics_Admin_Decision_Renderer
             'Recent payers at churn risk (' . $metrics['churn_inactivity_days'] . 'd inactive, paid in last ' . $metrics['recent_payer_window_days'] . 'd): ' . $this->page->format_number($metrics['churn_risk_recent_payers']),
             'AOV last 30d: ' . $this->page->format_money($metrics['aov_30d']),
             '--- Retention & Conversion Speed ---',
-            'Payer Churn Rate: ' . $this->page->format_percent($metrics['payer_churn_rate']) . ' (payers in prev 30d who did not pay in current 30d)',
-            'User Churn Rate: ' . $this->page->format_percent($metrics['user_churn_rate']) . ' (active users in prev 30d not active in current 30d)',
+            'Payer Inactivity Rate: ' . $this->page->format_percent($metrics['payer_churn_rate']) . ' (recent payers inactive for ' . $metrics['churn_inactivity_days'] . '+ days)',
+            'User Inactivity Rate: ' . $this->page->format_percent($metrics['user_churn_rate']) . ' (30d active users inactive for ' . $metrics['churn_inactivity_days'] . '+ days)',
             'Median Days to First Purchase: ' . $metrics['median_days_to_first_purchase'] . ' days',
         );
         ?>
@@ -83,8 +83,8 @@ class Growtype_Analytics_Admin_Decision_Renderer
         </div>
         <h3><?php _e('Retention & Conversion Speed', 'growtype-analytics'); ?></h3>
         <div class="analytics-scale-snapshot-grid">
-            <?php $this->render_snapshot_card(__('Payer Churn Rate', 'growtype-analytics'), $this->page->format_percent($metrics['payer_churn_rate']), __('Payers in prev 30d who did not pay in current 30d', 'growtype-analytics'), $metrics['payer_churn_rate'] <= 50); ?>
-            <?php $this->render_snapshot_card(__('User Churn Rate', 'growtype-analytics'), $this->page->format_percent($metrics['user_churn_rate']), __('Active users in prev 30d not active in current 30d', 'growtype-analytics'), $metrics['user_churn_rate'] <= 50); ?>
+            <?php $this->render_snapshot_card(__('Payer Inactivity Rate', 'growtype-analytics'), $this->page->format_percent($metrics['payer_churn_rate']), sprintf(__('Recent payers inactive for %d+ days', 'growtype-analytics'), $metrics['churn_inactivity_days']), $metrics['payer_churn_rate'] <= 50); ?>
+            <?php $this->render_snapshot_card(__('User Inactivity Rate', 'growtype-analytics'), $this->page->format_percent($metrics['user_churn_rate']), sprintf(__('30d active users inactive for %d+ days', 'growtype-analytics'), $metrics['churn_inactivity_days']), $metrics['user_churn_rate'] <= 50); ?>
             <?php $this->render_snapshot_card(__('Time to First Purchase', 'growtype-analytics'), $metrics['median_days_to_first_purchase'] . ' ' . __('days', 'growtype-analytics'), __('Median registration → first paid order', 'growtype-analytics')); ?>
         </div>
         <div class="analytics-snapshot-copy">

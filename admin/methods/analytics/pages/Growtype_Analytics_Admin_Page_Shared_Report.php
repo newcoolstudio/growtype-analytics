@@ -14,7 +14,7 @@ class Growtype_Analytics_Admin_Page_Shared_Report
     public function get_payload($link = array(), $refresh = false)
     {
         $token = !empty($link['token']) ? $link['token'] : 'default';
-        $cache_key = 'growtype_analytics_shared_report_' . $token;
+        $cache_key = 'growtype_analytics_shared_report_v2_' . $token;
         
         if ($refresh) {
             delete_transient($cache_key);
@@ -28,8 +28,7 @@ class Growtype_Analytics_Admin_Page_Shared_Report
 
         $title = !empty($link['label']) ? $link['label'] : __('Shared Business Report', 'growtype-analytics');
         $metrics = $this->controller->get_snapshot_metrics();
-        $source_page = $this->controller->analytics_page->get_page_by_class('Growtype_Analytics_Admin_Page_Source_Attribution');
-        $source_rows = $source_page ? $source_page->get_source_attribution_rows(20) : array();
+        $source_rows = $this->controller->get_source_attribution_rows(20);
 
         $funnel = $this->controller->funnel->get_funnel_dropoff_data();
         $offer_rows = $this->controller->get_offer_test_rows(20);
@@ -43,9 +42,8 @@ class Growtype_Analytics_Admin_Page_Shared_Report
         $top_characters = $this->controller->get_top_characters_by_revenue_data(30, 10);
         $growth_trends = $this->controller->get_growth_trends_data(30);
 
-        $margin_page = $this->controller->analytics_page->get_page_by_class('Growtype_Analytics_Admin_Page_Contribution_Margin');
-        $margin = $margin_page ? $margin_page->get_contribution_margin_data() : array('metrics' => array(), 'rows' => array());
-        $real_cost_data = $margin_page ? $margin_page->get_real_cost_refund_chargeback_data(30) : array('metrics' => array(), 'rows' => array());
+        $margin = $this->controller->get_contribution_margin_data();
+        $real_cost_data = $this->controller->get_real_cost_refund_chargeback_data(30);
         $refund_chargeback_rates = $this->controller->get_refund_chargeback_rates_data(30);
         $failure_segments = $this->controller->get_payment_failure_segments_data($metrics['settings'], 30, 25);
 
@@ -116,7 +114,9 @@ class Growtype_Analytics_Admin_Page_Shared_Report
             'buyer_cohorts' => $cohort_rows,
             'growth_trends_30d' => $growth_trends,
             'contribution_margin' => $margin['metrics'],
+            'contribution_margin_rows' => $margin['rows'],
             'real_cost_refund_chargeback' => $real_cost_data['metrics'],
+            'real_cost_rows' => $real_cost_data['rows'],
             'refund_chargeback_rates' => $refund_chargeback_rates,
         );
 
@@ -128,10 +128,25 @@ class Growtype_Analytics_Admin_Page_Shared_Report
     public function render_page($link = array(), $format = 'html')
     {
         $refresh = isset($_GET['refresh']) && $_GET['refresh'] === '1';
+        $token = !empty($link['token']) ? $link['token'] : 'default';
+        $cache_key_html = 'growtype_analytics_shared_report_html_v2_' . $token;
+
+        if ($format === 'html' && !$refresh) {
+            $cached_html = get_transient($cache_key_html);
+            if ($cached_html !== false) {
+                echo $cached_html;
+                return;
+            }
+        }
+
         $payload = $this->get_payload($link, $refresh);
 
         if ($format === 'json') {
             return $payload;
+        }
+
+        if ($format === 'html') {
+            ob_start();
         }
 
         $title = $payload['label'];
@@ -141,19 +156,17 @@ class Growtype_Analytics_Admin_Page_Shared_Report
         $retention_by_source = $payload['retention_by_source'];
         $source_payback = $payload['source_payback'];
         $language_conversion = $payload['language_conversion'];
-        $funnel_30 = $payload['funnel_dropoff_30d'];
+        $funnel_30 = array('rows' => $payload['funnel_dropoff_30d']);
         $offer_rows = $payload['offer_tests'];
         $offer_repurchase_quality = $payload['offer_repurchase_quality'];
         $top_characters = $payload['top_characters_by_revenue'];
         $cohort_rows = $payload['buyer_cohorts'];
         $growth_trends = $payload['growth_trends_30d'];
         $margin_metrics = $payload['contribution_margin'];
+        $margin_rows = $payload['contribution_margin_rows'];
         $real_cost_metrics = $payload['real_cost_refund_chargeback'];
+        $real_cost_rows = $payload['real_cost_rows'];
         $refund_chargeback_rates = $payload['refund_chargeback_rates'];
-        
-        $margin_page = $this->controller->analytics_page->get_page_by_class('Growtype_Analytics_Admin_Page_Contribution_Margin');
-        $margin_rows = $margin_page ? $margin_page->get_contribution_margin_data()['rows'] : array();
-        $real_cost_rows = $margin_page ? $margin_page->get_real_cost_refund_chargeback_data(30)['rows'] : array();
         ?><!doctype html>
         <html <?php language_attributes(); ?>>
         <head>
@@ -273,18 +286,19 @@ class Growtype_Analytics_Admin_Page_Shared_Report
 
             <div class="analytics-section">
                 <h2><?php _e('Growth Trends (30d)', 'growtype-analytics'); ?></h2>
-                <p class="description"><?php _e('Daily registrations, paid orders, revenue, and day-level conversion. Use this to see whether fixes are improving the business over time.', 'growtype-analytics'); ?></p>
+                <p class="description"><?php _e('Daily registrations, paid orders, revenue, and 7-day registration-cohort conversion. Use this to see whether fixes are improving the business over time without the misleading same-day order/register ratio.', 'growtype-analytics'); ?></p>
                 <?php
                 $trend_rows = array_map(function ($row) {
                     return array(
                         $row['date'],
                         $this->controller->format_number($row['registrations']),
                         $this->controller->format_number($row['paid_orders']),
+                        $this->controller->format_number($row['buyers_within_window']),
                         $this->controller->format_money($row['revenue']),
                         $this->controller->format_percent($row['conversion_rate']),
                     );
                 }, $growth_trends);
-                $this->decision_renderer->render_growth_table(array('Date', 'Registrations', 'Paid Orders', 'Revenue', 'Conversion'), $trend_rows);
+                $this->decision_renderer->render_growth_table(array('Date', 'Registrations', 'Paid Orders', '7d Buyers', 'Revenue', '7d Cohort Conversion'), $trend_rows);
                 ?>
             </div>
 
@@ -306,6 +320,7 @@ class Growtype_Analytics_Admin_Page_Shared_Report
                     <?php $this->decision_renderer->render_snapshot_card(__('Known Chargeback Amount 30d', 'growtype-analytics'), $this->controller->format_money($real_cost_metrics['known_chargeback_amount']), __('Configured from your payment processor data', 'growtype-analytics')); ?>
                     <?php $this->decision_renderer->render_snapshot_card(__('Net After Refunds & Chargebacks', 'growtype-analytics'), $this->controller->format_money($real_cost_metrics['net_after_refunds_chargebacks']), __('Contribution margin after refunds and known chargebacks', 'growtype-analytics')); ?>
                     <?php $this->decision_renderer->render_snapshot_card(__('Net Margin %', 'growtype-analytics'), $this->controller->format_percent($real_cost_metrics['net_margin_percent']), __('Net after refunds and chargebacks / revenue', 'growtype-analytics')); ?>
+                    <?php $this->decision_renderer->render_snapshot_card(__('Margin Confidence', 'growtype-analytics'), strtoupper($real_cost_metrics['quality']['confidence']), __('Based on configured AI, media, rev-share, and infra inputs', 'growtype-analytics')); ?>
                     <?php $this->decision_renderer->render_snapshot_card(__('Refund Rate', 'growtype-analytics'), $this->controller->format_percent($refund_chargeback_rates['refund_order_rate']), __('Refunded orders / paid orders in the last 30 days', 'growtype-analytics')); ?>
                     <?php $this->decision_renderer->render_snapshot_card(__('Chargeback Rate', 'growtype-analytics'), $this->controller->format_percent($refund_chargeback_rates['chargeback_order_rate']), __('Known chargebacks / paid orders in the last 30 days', 'growtype-analytics')); ?>
                 </div>
@@ -314,5 +329,10 @@ class Growtype_Analytics_Admin_Page_Shared_Report
         </div>
         </body>
         </html><?php
+        if ($format === 'html') {
+            $html = ob_get_clean();
+            set_transient($cache_key_html, $html, 10 * MINUTE_IN_SECONDS);
+            echo $html;
+        }
     }
 }

@@ -45,7 +45,7 @@ class Growtype_Analytics_Admin_Funnel
 
         // Main optimized query to get all funnel stages in one scan of users
         $query = "SELECT 
-                COUNT(u.ID) as registered,
+                COUNT(DISTINCT u.ID) as registered,
                 COUNT(DISTINCT CASE WHEN p_attempt.ID IS NOT NULL THEN u.ID END) as attempts,
                 COUNT(DISTINCT CASE WHEN p_paid.ID IS NOT NULL THEN u.ID END) as paid";
         

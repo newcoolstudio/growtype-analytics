@@ -242,6 +242,8 @@ class Growtype_Analytics_Admin_Page_Analytics extends Growtype_Analytics_Admin_B
                 continue;
             }
 
+            require_once $filename;
+
             if (class_exists($class_name)) {
                 $this->submenu_pages[] = new $class_name($this->controller);
             }
