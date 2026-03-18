@@ -10,10 +10,13 @@
  * @subpackage growtype_analytics/admin/methods/analytics
  */
 
-class Growtype_Analytics_Admin_Page_Paywall_Chart
+class Growtype_Analytics_Admin_Paywall_Chart
 {
-    public function __construct()
+    private $controller;
+
+    public function __construct($controller)
     {
+        $this->controller = $controller;
         add_action('wp_ajax_get_paywall_views_chart_data', array($this, 'ajax_get_paywall_views_chart_data'));
     }
 
@@ -28,14 +31,14 @@ class Growtype_Analytics_Admin_Page_Paywall_Chart
                 <h2><?php _e('Paywall Views', 'growtype-analytics'); ?></h2>
                 <p class="description"><?php _e('How many users actually see pricing', 'growtype-analytics'); ?></p>
                 <div class="analytics-chart-controls">
-                    <button type="button" class="button paywall-chart-period-btn active" data-period="week"><?php _e('One Week', 'growtype-analytics'); ?></button>
-                    <button type="button" class="button paywall-chart-period-btn" data-period="month"><?php _e('One Month', 'growtype-analytics'); ?></button>
+                    <button type="button" class="button analytics-chart-period-btn active" data-period="week" data-action="get_paywall_views_chart_data" data-chart="paywallViewsChart"><?php _e('One Week', 'growtype-analytics'); ?></button>
+                    <button type="button" class="button analytics-chart-period-btn" data-period="month" data-action="get_paywall_views_chart_data" data-chart="paywallViewsChart"><?php _e('One Month', 'growtype-analytics'); ?></button>
                 </div>
             </div>
             
             <div class="analytics-chart-container">
                 <canvas id="paywallViewsChart"></canvas>
-                <div class="paywall-chart-loading-overlay" style="display: none;">
+                <div class="analytics-chart-loading-overlay" style="display: none;">
                     <span class="spinner is-active"></span>
                 </div>
             </div>
@@ -53,7 +56,13 @@ class Growtype_Analytics_Admin_Page_Paywall_Chart
         $period = isset($_POST['period']) ? sanitize_text_field($_POST['period']) : 'week';
         $days = ($period === 'month') ? 30 : 7;
 
-        $data = $this->get_paywall_views_data($days);
+        $cache_key = 'growtype_paywall_chart_' . $period;
+        $data = get_transient($cache_key);
+
+        if (false === $data) {
+            $data = $this->get_paywall_views_data($days);
+            set_transient($cache_key, $data, HOUR_IN_SECONDS);
+        }
 
         wp_send_json_success(array(
             'chart_data' => $data
@@ -76,44 +85,43 @@ class Growtype_Analytics_Admin_Page_Paywall_Chart
         $posthog_conversion_rates = array();
         $wc_conversion_rates = array();
 
-        // Generate date range
+        $start_date = date('Y-m-d', strtotime("-" . ($days - 1) . " days"));
+        $end_date = date('Y-m-d');
+
+        // Batch fetch all data
+        $batched_users = $this->controller->metrics->get_batched_user_data($start_date);
+        $batched_wc = $this->fetch_batched_wc_data($start_date);
+        $batched_posthog = $this->fetch_batched_posthog_data($start_date, $end_date);
+
+        // Generate date range and map data
         for ($i = $days - 1; $i >= 0; $i--) {
             $date = date('Y-m-d', strtotime("-$i days"));
             $labels[] = date('M d', strtotime($date));
-            
-            // Count new users registered on that day
-            $total_users_count = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(ID) 
-                 FROM $wpdb->users 
-                 WHERE DATE(user_registered) = %s",
-                $date
-            ));
 
-            $total_users_count = (int) ($total_users_count ?: 0);
+            // New Users
+            $total_users_count = isset($batched_users[$date]) ? (int) $batched_users[$date] : 0;
             $total_users[] = $total_users_count;
 
-            // Count users who viewed the /plans/ page on that day from PostHog
-            $paywall_views_count = $this->get_posthog_plans_pageviews($date);
-
-            $paywall_views_count = (int) ($paywall_views_count ?: 0);
+            // Paywall Views (PostHog)
+            $paywall_views_count = isset($batched_posthog['pageviews'][$date]) ? (int) $batched_posthog['pageviews'][$date] : 0;
             $paywall_viewers[] = $paywall_views_count;
 
-            // Calculate view rate as percentage
+            // Calculate view rate
             $view_rate = $total_users_count > 0 ? round(($paywall_views_count / $total_users_count) * 100, 2) : 0;
             $view_rates[] = $view_rate;
 
-            // Get PostHog purchase events
-            $posthog_purchase_count = $this->get_posthog_purchases($date);
+            // PostHog Purchases
+            $posthog_purchase_count = isset($batched_posthog['purchases'][$date]) ? (int) $batched_posthog['purchases'][$date] : 0;
             $posthog_purchases[] = $posthog_purchase_count;
-            
+
             // Calculate PostHog conversion rate
             $posthog_conv_rate = $total_users_count > 0 ? round(($posthog_purchase_count / $total_users_count) * 100, 2) : 0;
             $posthog_conversion_rates[] = $posthog_conv_rate;
 
-            // Get WooCommerce purchases
-            $wc_purchase_count = $this->get_woocommerce_purchases($date);
+            // WooCommerce Purchases
+            $wc_purchase_count = isset($batched_wc[$date]) ? (int) $batched_wc[$date] : 0;
             $wc_purchases[] = $wc_purchase_count;
-            
+
             // Calculate WooCommerce conversion rate
             $wc_conv_rate = $total_users_count > 0 ? round(($wc_purchase_count / $total_users_count) * 100, 2) : 0;
             $wc_conversion_rates[] = $wc_conv_rate;
@@ -127,7 +135,7 @@ class Growtype_Analytics_Admin_Page_Paywall_Chart
                     'data' => $paywall_viewers,
                     'color' => '#4caf50',
                     'type' => 'line',
-                    'view_rates' => $view_rates  // Include view rates for tooltip
+                    'view_rates' => $view_rates
                 ),
                 array(
                     'label' => __('PostHog Purchases', 'growtype-analytics'),
@@ -153,27 +161,51 @@ class Growtype_Analytics_Admin_Page_Paywall_Chart
         );
     }
 
-    /**
-     * Get PostHog pageview count for /plans/ URL on a specific date
-     */
-    private function get_posthog_plans_pageviews($date)
+
+
+    private function fetch_batched_wc_data($start_date)
+    {
+        if (!class_exists('WooCommerce')) {
+            return array();
+        }
+
+        global $wpdb;
+        $results = $wpdb->get_results($wpdb->prepare(
+            "SELECT DATE(p.post_date) as order_date, COUNT(DISTINCT p.ID) as count
+             FROM {$wpdb->posts} p
+             WHERE p.post_type = 'shop_order'
+             AND p.post_status IN ('wc-completed', 'wc-processing')
+             AND p.post_date >= %s
+             GROUP BY order_date",
+            $start_date
+        ), ARRAY_A);
+
+        $data = array();
+        foreach ($results as $row) {
+            $data[$row['order_date']] = $row['count'];
+        }
+        return $data;
+    }
+
+    private function fetch_batched_posthog_data($start_date, $end_date)
     {
         $api_key = get_option('growtype_analytics_posthog_details_api_key');
         $project_id = get_option('growtype_analytics_posthog_details_project_id');
         $host = get_option('growtype_analytics_posthog_details_host', 'https://eu.i.posthog.com');
 
+        $data = array('pageviews' => array(), 'purchases' => array());
+
         if (empty($api_key) || empty($project_id)) {
-            return 0;
+            return $data;
         }
 
         $host = rtrim($host, '/');
-        
-        // Query for pageviews on the specific date with /plans/ in the URL
+
         $url = add_query_arg(array(
             'insight'   => 'TRENDS',
             'interval'  => 'day',
-            'date_from' => $date,
-            'date_to'   => $date,
+            'date_from' => $start_date,
+            'date_to'   => $end_date,
             'events'    => json_encode(array(
                 array(
                     'id'   => '$pageview',
@@ -186,58 +218,7 @@ class Growtype_Analytics_Admin_Page_Paywall_Chart
                             'type' => 'event'
                         )
                     )
-                )
-            ))
-        ), $host . '/api/projects/' . $project_id . '/insights/trend/');
-
-        $response = wp_remote_get($url, array(
-            'headers' => array(
-                'Authorization' => 'Bearer ' . $api_key,
-                'Content-Type'  => 'application/json',
-            ),
-            'timeout' => 15
-        ));
-
-        if (is_wp_error($response)) {
-            return 0;
-        }
-
-        $status_code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-
-        if ($status_code !== 200 || empty($data['result']) || !isset($data['result'][0]['data'])) {
-            return 0;
-        }
-
-        $result_data = $data['result'][0]['data'];
-        
-        // Return the count for the specific date (should be first/only element)
-        return isset($result_data[0]) ? (int) $result_data[0] : 0;
-    }
-
-    /**
-     * Get PostHog purchase events count for a specific date
-     */
-    private function get_posthog_purchases($date)
-    {
-        $api_key = get_option('growtype_analytics_posthog_details_api_key');
-        $project_id = get_option('growtype_analytics_posthog_details_project_id');
-        $host = get_option('growtype_analytics_posthog_details_host', 'https://eu.i.posthog.com');
-
-        if (empty($api_key) || empty($project_id)) {
-            return 0;
-        }
-
-        $host = rtrim($host, '/');
-        
-        // Query for purchase events on the specific date
-        $url = add_query_arg(array(
-            'insight'   => 'TRENDS',
-            'interval'  => 'day',
-            'date_from' => $date,
-            'date_to'   => $date,
-            'events'    => json_encode(array(
+                ),
                 array(
                     'id'   => 'growtype_analytics_growtype_wc_purchase',
                     'math' => 'dau'
@@ -250,48 +231,32 @@ class Growtype_Analytics_Admin_Page_Paywall_Chart
                 'Authorization' => 'Bearer ' . $api_key,
                 'Content-Type'  => 'application/json',
             ),
-            'timeout' => 15
+            'timeout' => 30
         ));
 
-        if (is_wp_error($response)) {
-            return 0;
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+            return $data;
         }
 
-        $status_code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-
-        if ($status_code !== 200 || empty($data['result']) || !isset($data['result'][0]['data'])) {
-            return 0;
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        if (empty($body['result'])) {
+            return $data;
         }
 
-        $result_data = $data['result'][0]['data'];
-        
-        return isset($result_data[0]) ? (int) $result_data[0] : 0;
-    }
-
-    /**
-     * Get WooCommerce purchase count for a specific date
-     */
-    private function get_woocommerce_purchases($date)
-    {
-        // Check if WooCommerce is active
-        if (!class_exists('WooCommerce')) {
-            return 0;
+        // Map results back to dates
+        foreach ($body['result'] as $index => $series) {
+            $key = ($index === 0) ? 'pageviews' : 'purchases';
+            if (isset($series['data']) && isset($series['labels'])) {
+                foreach ($series['labels'] as $i => $label) {
+                    // PostHog labels are like "18-Mar-2026" or similar, but the 'days' array is also available
+                    if (isset($series['days'][$i])) {
+                        $date = $series['days'][$i];
+                        $data[$key][$date] = $series['data'][$i];
+                    }
+                }
+            }
         }
 
-        global $wpdb;
-
-        // Count completed orders on that date
-        $count = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(DISTINCT p.ID)
-             FROM {$wpdb->posts} p
-             WHERE p.post_type = 'shop_order'
-             AND p.post_status IN ('wc-completed', 'wc-processing')
-             AND DATE(p.post_date) = %s",
-            $date
-        ));
-
-        return (int) ($count ?: 0);
+        return $data;
     }
 }

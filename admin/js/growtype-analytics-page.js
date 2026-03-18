@@ -37,7 +37,7 @@
             if (!ctx) return;
 
             this.uniqueUsersChart = this.createChart(ctx, 'Unique Users', '#764ba2', 'rgba(118, 75, 162, 0.1)');
-            this.loadChartData('get_unique_users_chart_data', 'week', this.uniqueUsersChart, $('.chart-loading-overlay'));
+            this.loadChartData('get_unique_users_chart_data', 'week', this.uniqueUsersChart, $('#uniqueUsersChart').closest('.analytics-section').find('.analytics-chart-loading-overlay'));
         },
 
         /**
@@ -48,7 +48,7 @@
             if (!ctx) return;
 
             this.dailyRegistrationsChart = this.createChart(ctx, 'Registrations', '#f5576c', 'rgba(245, 87, 108, 0.1)', true);
-            this.loadChartData('get_daily_registrations_chart_data', 'week', this.dailyRegistrationsChart, $('.registrations-chart-loading-overlay'));
+            this.loadChartData('get_daily_registrations_chart_data', 'week', this.dailyRegistrationsChart, $('#dailyRegistrationsChart').closest('.analytics-section').find('.analytics-chart-loading-overlay'));
         },
 
         /**
@@ -59,7 +59,7 @@
             if (!ctx) return;
 
             this.activationRateChart = this.createMixedChart(ctx);
-            this.loadChartData('get_activation_rate_chart_data', 'week', this.activationRateChart, $('.activation-chart-loading-overlay'));
+            this.loadChartData('get_activation_rate_chart_data', 'week', this.activationRateChart, $('#activationRateChart').closest('.analytics-section').find('.analytics-chart-loading-overlay'));
         },
 
         /**
@@ -70,7 +70,7 @@
             if (!ctx) return;
 
             this.paywallViewsChart = this.createMixedChart(ctx);
-            this.loadChartData('get_paywall_views_chart_data', 'week', this.paywallViewsChart, $('.paywall-chart-loading-overlay'));
+            this.loadChartData('get_paywall_views_chart_data', 'week', this.paywallViewsChart, $('#paywallViewsChart').closest('.analytics-section').find('.analytics-chart-loading-overlay'));
         },
 
         /**
@@ -81,7 +81,7 @@
             if (!ctx) return;
 
             this.userRetentionChart = this.createMixedChart(ctx);
-            this.loadChartData('get_user_retention_chart_data', 'week', this.userRetentionChart, $('.retention-chart-loading-overlay'));
+            this.loadChartData('get_user_retention_chart_data', 'week', this.userRetentionChart, $('#userRetentionChart').closest('.analytics-section').find('.analytics-chart-loading-overlay'));
         },
 
         /**
@@ -259,64 +259,24 @@
         bindEvents: function () {
             const self = this;
 
-            // Unique Users Chart Period Buttons
-            $('.chart-period-btn').on('click', function () {
+            // Handle all chart period button clicks with a single listener
+            $('.analytics-chart-period-btn').on('click', function () {
                 const $btn = $(this);
                 if ($btn.hasClass('active')) return;
 
-                $('.chart-period-btn').removeClass('active');
+                const $container = $btn.closest('.analytics-section');
+                $container.find('.analytics-chart-period-btn').removeClass('active');
                 $btn.addClass('active');
 
+                const action = $btn.data('action');
                 const period = $btn.data('period');
-                self.loadChartData('get_unique_users_chart_data', period, self.uniqueUsersChart, $('.chart-loading-overlay'));
-            });
+                const chartName = $btn.data('chart');
+                const chartInstance = self[chartName];
+                const $loader = $container.find('.analytics-chart-loading-overlay');
 
-            // Registrations Chart Period Buttons
-            $('.registrations-chart-period-btn').on('click', function () {
-                const $btn = $(this);
-                if ($btn.hasClass('active')) return;
-
-                $('.registrations-chart-period-btn').removeClass('active');
-                $btn.addClass('active');
-
-                const period = $btn.data('period');
-                self.loadChartData('get_daily_registrations_chart_data', period, self.dailyRegistrationsChart, $('.registrations-chart-loading-overlay'));
-            });
-
-            // Activation Rate Chart Period Buttons
-            $('.activation-chart-period-btn').on('click', function () {
-                const $btn = $(this);
-                if ($btn.hasClass('active')) return;
-
-                $('.activation-chart-period-btn').removeClass('active');
-                $btn.addClass('active');
-
-                const period = $btn.data('period');
-                self.loadChartData('get_activation_rate_chart_data', period, self.activationRateChart, $('.activation-chart-loading-overlay'));
-            });
-
-            // Paywall Views Chart Period Buttons
-            $('.paywall-chart-period-btn').on('click', function () {
-                const $btn = $(this);
-                if ($btn.hasClass('active')) return;
-
-                $('.paywall-chart-period-btn').removeClass('active');
-                $btn.addClass('active');
-
-                const period = $btn.data('period');
-                self.loadChartData('get_paywall_views_chart_data', period, self.paywallViewsChart, $('.paywall-chart-loading-overlay'));
-            });
-
-            // User Retention Chart Period Buttons
-            $('.retention-chart-period-btn').on('click', function () {
-                const $btn = $(this);
-                if ($btn.hasClass('active')) return;
-
-                $('.retention-chart-period-btn').removeClass('active');
-                $btn.addClass('active');
-
-                const period = $btn.data('period');
-                self.loadChartData('get_user_retention_chart_data', period, self.userRetentionChart, $('.retention-chart-loading-overlay'));
+                if (chartInstance && action) {
+                    self.loadChartData(action, period, chartInstance, $loader);
+                }
             });
         },
 
@@ -386,12 +346,9 @@
                             chartInstance.update();
                         }
 
-                        // Debug logging for PostHog if available
+                        // PostHog data source information (preserved in response but hidden from console)
                         if (action === 'get_unique_users_chart_data') {
-                            console.log('Unique Users Source:', data.source);
-                            if (data.debug) {
-                                console.log('PostHog Debug Info:', data.debug);
-                            }
+                            this.posthogSource = data.source;
                         }
                     }
                     $loader.hide();

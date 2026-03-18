@@ -102,4 +102,5 @@ gtag('config', '" . esc_js($this->ga4_id) . "');
             'user_id' => apply_filters('growtype_analytics_default_user_id', get_current_user_id()),
         ));
     }
+
 }

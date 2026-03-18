@@ -16,7 +16,7 @@ class Growtype_Analytics_Rest_Api_Docs
      */
     public function __construct()
     {
-        add_action('rest_api_init', array($this, 'register_routes'));
+        add_action('rest_api_init', array ($this, 'register_routes'));
     }
 
     /**
@@ -24,10 +24,10 @@ class Growtype_Analytics_Rest_Api_Docs
      */
     public function register_routes()
     {
-        register_rest_route('growtype-analytics/v1', '/docs', array(
-            array(
-                'methods'             => WP_REST_Server::READABLE,
-                'callback'            => array($this, 'get_docs'),
+        register_rest_route('growtype-analytics/v1', '/docs', array (
+            array (
+                'methods' => WP_REST_Server::READABLE,
+                'callback' => array ($this, 'get_docs'),
                 'permission_callback' => '__return_true', // Documentation is public
             ),
         ));
@@ -42,51 +42,51 @@ class Growtype_Analytics_Rest_Api_Docs
     public function get_docs($request)
     {
         $base_url = rest_url('growtype-analytics/v1');
-        
-        $docs = array(
-            'title'       => __('Growtype Analytics API Documentation', 'growtype-analytics'),
+
+        $docs = array (
+            'title' => __('Growtype Analytics API Documentation', 'growtype-analytics'),
             'description' => __('Universal API for fetching platform analytics data.', 'growtype-analytics'),
-            'endpoints'   => array(
-                'docs' => array(
-                    'url'         => $base_url . '/docs',
-                    'method'      => 'GET',
+            'endpoints' => array (
+                'docs' => array (
+                    'url' => $base_url . '/docs',
+                    'method' => 'GET',
                     'description' => __('Get API documentation.', 'growtype-analytics'),
                     'permissions' => __('Public', 'growtype-analytics'),
                 ),
-                'users' => array(
-                    'url'         => $base_url . '/users',
-                    'method'      => 'GET',
+                'users' => array (
+                    'url' => $base_url . '/users',
+                    'method' => 'GET',
                     'description' => __('Get list of registered users for a specific period.', 'growtype-analytics'),
                     'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                    'parameters'  => array(
-                        'period'     => array('week', 'month', 'year', 'all'),
+                    'parameters' => array (
+                        'period' => array ('week', 'month', 'year', 'all'),
                         'start_date' => 'YYYY-MM-DD (or use date_from)',
-                        'end_date'   => 'YYYY-MM-DD (or use date_to)',
-                        'date_from'  => 'YYYY-MM-DD (alias for start_date)',
-                        'date_to'    => 'YYYY-MM-DD (alias for end_date)',
+                        'end_date' => 'YYYY-MM-DD (or use date_to)',
+                        'date_from' => 'YYYY-MM-DD (alias for start_date)',
+                        'date_to' => 'YYYY-MM-DD (alias for end_date)',
                     ),
-                    'sample_queries' => array(
-                        'last_week'    => $base_url . '/users?period=week',
-                        'last_month'   => $base_url . '/users?period=month',
+                    'sample_queries' => array (
+                        'last_week' => $base_url . '/users?period=week',
+                        'last_month' => $base_url . '/users?period=month',
                         'custom_range' => $base_url . '/users?start_date=2023-01-01&end_date=2023-01-31',
                         'custom_range_alt' => $base_url . '/users?date_from=2023-01-01&date_to=2023-01-31',
                     ),
                 ),
-                'users/daily' => array(
-                    'url'         => $base_url . '/users/daily',
-                    'method'      => 'GET',
+                'users/daily' => array (
+                    'url' => $base_url . '/users/daily',
+                    'method' => 'GET',
                     'description' => __('Get daily registrations for a specific period.', 'growtype-analytics'),
                     'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                    'parameters'  => array(
-                        'period'     => array('week', 'month', 'year', 'all'),
+                    'parameters' => array (
+                        'period' => array ('week', 'month', 'year', 'all'),
                         'start_date' => 'YYYY-MM-DD (or use date_from)',
-                        'end_date'   => 'YYYY-MM-DD (or use date_to)',
-                        'date_from'  => 'YYYY-MM-DD (alias for start_date)',
-                        'date_to'    => 'YYYY-MM-DD (alias for end_date)',
+                        'end_date' => 'YYYY-MM-DD (or use date_to)',
+                        'date_from' => 'YYYY-MM-DD (alias for start_date)',
+                        'date_to' => 'YYYY-MM-DD (alias for end_date)',
                     ),
-                    'sample_queries' => array(
-                        'last_week'    => $base_url . '/users/daily?period=week',
-                        'last_month'   => $base_url . '/users/daily?period=month',
+                    'sample_queries' => array (
+                        'last_week' => $base_url . '/users/daily?period=week',
+                        'last_month' => $base_url . '/users/daily?period=month',
                         'custom_range' => $base_url . '/users/daily?start_date=2023-01-01&end_date=2023-01-31',
                         'custom_range_alt' => $base_url . '/users/daily?date_from=2023-01-01&date_to=2023-01-31',
                     ),
@@ -95,329 +95,409 @@ class Growtype_Analytics_Rest_Api_Docs
         );
 
         if (class_exists('Growtype_Chat')) {
-            $docs['endpoints']['chat/messages/daily'] = array(
-                'url'         => $base_url . '/chat/messages/daily',
-                'method'      => 'GET',
+            $docs['endpoints']['chat/messages/daily'] = array (
+                'url' => $base_url . '/chat/messages/daily',
+                'method' => 'GET',
                 'description' => __('Get daily chat message counts for a specific period.', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'period'     => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'period' => array ('week', 'month', 'year', 'all'),
                     'start_date' => 'YYYY-MM-DD (or use date_from)',
-                    'end_date'   => 'YYYY-MM-DD (or use date_to)',
-                    'date_from'  => 'YYYY-MM-DD (alias for start_date)',
-                    'date_to'    => 'YYYY-MM-DD (alias for end_date)',
-                    'user_type'  => array('bot', 'wp_user'),
+                    'end_date' => 'YYYY-MM-DD (or use date_to)',
+                    'date_from' => 'YYYY-MM-DD (alias for start_date)',
+                    'date_to' => 'YYYY-MM-DD (alias for end_date)',
+                    'user_type' => array ('bot', 'wp_user'),
                 ),
-                'sample_queries' => array(
-                    'last_week'    => $base_url . '/chat/messages/daily?period=week',
-                    'last_month'   => $base_url . '/chat/messages/daily?period=month',
-                    'bots_only'    => $base_url . '/chat/messages/daily?user_type=bot&period=week',
-                    'users_only'   => $base_url . '/chat/messages/daily?user_type=wp_user&period=week',
+                'sample_queries' => array (
+                    'last_week' => $base_url . '/chat/messages/daily?period=week',
+                    'last_month' => $base_url . '/chat/messages/daily?period=month',
+                    'bots_only' => $base_url . '/chat/messages/daily?user_type=bot&period=week',
+                    'users_only' => $base_url . '/chat/messages/daily?user_type=wp_user&period=week',
                     'custom_range' => $base_url . '/chat/messages/daily?date_from=2023-01-01&date_to=2023-01-31',
                 ),
             );
-            $docs['endpoints']['chat/users/daily'] = array(
-                'url'         => $base_url . '/chat/users/daily',
-                'method'      => 'GET',
+            $docs['endpoints']['chat/users/daily'] = array (
+                'url' => $base_url . '/chat/users/daily',
+                'method' => 'GET',
                 'description' => __('Get daily active users who sent at least X messages.', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
+                'parameters' => array (
                     'min_messages' => __('Minimum number of messages to be considered active (default 1).', 'growtype-analytics'),
-                    'period'       => array('week', 'month', 'year', 'all'),
-                    'start_date'   => 'YYYY-MM-DD',
-                    'end_date'     => 'YYYY-MM-DD',
-                    'user_type'    => array('bot', 'wp_user'),
+                    'period' => array ('week', 'month', 'year', 'all'),
+                    'start_date' => 'YYYY-MM-DD',
+                    'end_date' => 'YYYY-MM-DD',
+                    'user_type' => array ('bot', 'wp_user'),
                 ),
-                'sample_queries' => array(
-                    'sent_at_least_1'  => $base_url . '/chat/users/daily?min_messages=1&period=week',
-                    'bots_at_least_3'  => $base_url . '/chat/users/daily?min_messages=3&user_type=bot&period=week',
-                    'users_at_least_10'=> $base_url . '/chat/users/daily?min_messages=10&user_type=wp_user&period=week',
+                'sample_queries' => array (
+                    'sent_at_least_1' => $base_url . '/chat/users/daily?min_messages=1&period=week',
+                    'bots_at_least_3' => $base_url . '/chat/users/daily?min_messages=3&user_type=bot&period=week',
+                    'users_at_least_10' => $base_url . '/chat/users/daily?min_messages=10&user_type=wp_user&period=week',
                 ),
             );
-            $docs['endpoints']['chat/characters/popular'] = array(
-                'url'         => $base_url . '/chat/characters/popular',
-                'method'      => 'GET',
+            $docs['endpoints']['chat/characters/popular'] = array (
+                'url' => $base_url . '/chat/characters/popular',
+                'method' => 'GET',
                 'description' => __('Get daily rankings of the most popular characters based on message count. Returns the top N characters (by total message volume for the period) with their daily message counts.', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'limit'      => __('Number of top characters to retrieve (default 3). Common values: 3, 5, 10.', 'growtype-analytics'),
-                    'period'     => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'limit' => __('Number of top characters to retrieve (default 3). Common values: 3, 5, 10.', 'growtype-analytics'),
+                    'period' => array ('week', 'month', 'year', 'all'),
                     'start_date' => 'YYYY-MM-DD',
-                    'end_date'   => 'YYYY-MM-DD',
+                    'end_date' => 'YYYY-MM-DD',
                 ),
-                'response_format' => array(
+                'response_format' => array (
                     'structure' => 'daily_popular_characters: { "YYYY-MM-DD": [ { character_slug, message_count }, ... ] }',
-                    'notes'     => 'The endpoint first identifies the top N characters by total popularity, then returns their daily breakdown. Character slugs are resolved from encrypted session metadata and the character database.',
+                    'notes' => 'The endpoint first identifies the top N characters by total popularity, then returns their daily breakdown. Character slugs are resolved from encrypted session metadata and the character database.',
                 ),
-                'sample_queries' => array(
-                    'top_3_last_week'    => $base_url . '/chat/characters/popular?period=week',
-                    'top_5_last_month'   => $base_url . '/chat/characters/popular?limit=5&period=month',
-                    'top_10_custom_range'=> $base_url . '/chat/characters/popular?limit=10&start_date=2025-12-01&end_date=2025-12-31',
+                'sample_queries' => array (
+                    'top_3_last_week' => $base_url . '/chat/characters/popular?period=week',
+                    'top_5_last_month' => $base_url . '/chat/characters/popular?limit=5&period=month',
+                    'top_10_custom_range' => $base_url . '/chat/characters/popular?limit=10&start_date=2025-12-01&end_date=2025-12-31',
                 ),
             );
-            $docs['endpoints']['chat/conversations/buyers'] = array(
-                'url'         => $base_url . '/chat/conversations/buyers',
-                'method'      => 'GET',
+            $docs['endpoints']['chat/conversations/buyers'] = array (
+                'url' => $base_url . '/chat/conversations/buyers',
+                'method' => 'GET',
                 'description' => __('Get recent chat conversations for users who have completed purchases. Used for analyzing high-intent behavior and successful conversion paths.', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'limit'          => __('Number of unique buyers to retrieve (default 10).', 'growtype-analytics'),
+                'parameters' => array (
+                    'limit' => __('Number of unique buyers to retrieve (default 10).', 'growtype-analytics'),
                     'messages_limit' => __('Number of messages to retrieve per conversation (default 20).', 'growtype-analytics'),
                 ),
-                'response_format' => array(
+                'response_format' => array (
                     'metrics' => 'Includes current_credits, credits_spent, total_credits_bought, and total_spent_currency.',
-                    'notes'   => 'Automatically decrypts message content and excludes @talkiemate.com domain accounts.',
+                    'notes' => 'Automatically decrypts message content and excludes @talkiemate.com domain accounts.',
                 ),
-                'sample_queries' => array(
+                'sample_queries' => array (
                     'recent_10_buyers' => $base_url . '/chat/conversations/buyers',
-                    'deep_dive_5'      => $base_url . '/chat/conversations/buyers?limit=5&messages_limit=100',
+                    'deep_dive_5' => $base_url . '/chat/conversations/buyers?limit=5&messages_limit=100',
                 ),
             );
-            $docs['endpoints']['chat/conversations/non-buyers'] = array(
-                'url'         => $base_url . '/chat/conversations/non-buyers',
-                'method'      => 'GET',
+            $docs['endpoints']['chat/conversations/non-buyers'] = array (
+                'url' => $base_url . '/chat/conversations/non-buyers',
+                'method' => 'GET',
                 'description' => __('Get recent chat conversations for registered users who have NOT made any purchases. Prioritizes highly active users to identify drops-offs and free-usage patterns (The Generosity Trap).', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'limit'          => __('Number of unique non-buyers to retrieve (default 10).', 'growtype-analytics'),
+                'parameters' => array (
+                    'limit' => __('Number of unique non-buyers to retrieve (default 10).', 'growtype-analytics'),
                     'messages_limit' => __('Number of messages to retrieve per conversation (default 20).', 'growtype-analytics'),
                 ),
-                'response_format' => array(
+                'response_format' => array (
                     'metrics' => 'Includes current_credits, credits_spent, and lifetime_messages.',
-                    'notes'   => 'Automatically decrypts message content and excludes @talkiemate.com domain accounts.',
+                    'notes' => 'Automatically decrypts message content and excludes @talkiemate.com domain accounts.',
                 ),
-                'sample_queries' => array(
+                'sample_queries' => array (
                     'active_non_buyers' => $base_url . '/chat/conversations/non-buyers',
                     'friction_analysis' => $base_url . '/chat/conversations/non-buyers?limit=20&messages_limit=50',
                 ),
             );
-            $docs['endpoints']['chat/conversations/newest'] = array(
-                'url'         => $base_url . '/chat/conversations/newest',
-                'method'      => 'GET',
+            $docs['endpoints']['chat/conversations/newest'] = array (
+                'url' => $base_url . '/chat/conversations/newest',
+                'method' => 'GET',
                 'description' => __('Get recent chat conversations for the newest registered users, combining both buyers and non-buyers. Perfect for a "Live Feed" of current traffic activity.', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'limit'          => __('Number of unique users to retrieve (default 10, max 100).', 'growtype-analytics'),
+                'parameters' => array (
+                    'limit' => __('Number of unique users to retrieve (default 10, max 100).', 'growtype-analytics'),
                     'messages_limit' => __('Number of messages to retrieve per conversation (default 20).', 'growtype-analytics'),
                 ),
-                'response_format' => array(
+                'response_format' => array (
                     'metrics' => 'Includes current_credits, credits_spent, total_credits_bought, total_spent_currency, and purchase_attempts.',
-                    'notes'   => 'Prioritizes by newest registration date. Automatically decrypts message content and excludes squad team accounts.',
+                    'notes' => 'Prioritizes by newest registration date. Automatically decrypts message content and excludes squad team accounts.',
                 ),
-                'sample_queries' => array(
-                    'live_feed_10'   => $base_url . '/chat/conversations/newest',
+                'sample_queries' => array (
+                    'live_feed_10' => $base_url . '/chat/conversations/newest',
                     'deep_audit_100' => $base_url . '/chat/conversations/newest?limit=100&messages_limit=50',
                 ),
             );
         }
 
         if (class_exists('WooCommerce')) {
-            $docs['endpoints']['orders'] = array(
-                'url'         => $base_url . '/orders',
-                'method'      => 'GET',
+            $docs['endpoints']['orders'] = array (
+                'url' => $base_url . '/orders',
+                'method' => 'GET',
                 'description' => __('Get WooCommerce orders for a specific period and status.', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'status'     => array('purchased', 'pending', 'all', 'any', 'completed', 'processing', 'on-hold', 'cancelled', 'refunded', 'failed'),
-                    'period'     => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'status' => array ('purchased', 'pending', 'all', 'any', 'completed', 'processing', 'on-hold', 'cancelled', 'refunded', 'failed'),
+                    'period' => array ('week', 'month', 'year', 'all'),
                     'start_date' => 'YYYY-MM-DD (or use date_from)',
-                    'end_date'   => 'YYYY-MM-DD (or use date_to)',
-                    'date_from'  => 'YYYY-MM-DD (alias for start_date)',
-                    'date_to'    => 'YYYY-MM-DD (alias for end_date)',
+                    'end_date' => 'YYYY-MM-DD (or use date_to)',
+                    'date_from' => 'YYYY-MM-DD (alias for start_date)',
+                    'date_to' => 'YYYY-MM-DD (alias for end_date)',
                 ),
-                'sample_queries' => array(
+                'sample_queries' => array (
                     'completed_last_month' => $base_url . '/orders?status=completed&period=month',
-                    'pending_orders'       => $base_url . '/orders?status=pending',
-                    'annual_report'        => $base_url . '/orders?period=year',
-                    'custom_range'         => $base_url . '/orders?date_from=2023-01-01&date_to=2023-01-31',
+                    'pending_orders' => $base_url . '/orders?status=pending',
+                    'annual_report' => $base_url . '/orders?period=year',
+                    'custom_range' => $base_url . '/orders?date_from=2023-01-01&date_to=2023-01-31',
                 ),
             );
-            $docs['endpoints']['orders/daily'] = array(
-                'url'         => $base_url . '/orders/daily',
-                'method'      => 'GET',
+            $docs['endpoints']['orders/daily'] = array (
+                'url' => $base_url . '/orders/daily',
+                'method' => 'GET',
                 'description' => __('Get daily WooCommerce order counts for a specific period (returns date => count).', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'status'     => array('purchased', 'pending', 'all', 'any', 'completed', 'processing', 'on-hold', 'cancelled', 'refunded', 'failed'),
-                    'period'     => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'status' => array ('purchased', 'pending', 'all', 'any', 'completed', 'processing', 'on-hold', 'cancelled', 'refunded', 'failed'),
+                    'period' => array ('week', 'month', 'year', 'all'),
                     'start_date' => 'YYYY-MM-DD (or use date_from)',
-                    'end_date'   => 'YYYY-MM-DD (or use date_to)',
-                    'date_from'  => 'YYYY-MM-DD (alias for start_date)',
-                    'date_to'    => 'YYYY-MM-DD (alias for end_date)',
+                    'end_date' => 'YYYY-MM-DD (or use date_to)',
+                    'date_from' => 'YYYY-MM-DD (alias for start_date)',
+                    'date_to' => 'YYYY-MM-DD (alias for end_date)',
                 ),
-                'sample_queries' => array(
+                'sample_queries' => array (
                     'purchased_daily_week' => $base_url . '/orders/daily?period=week&status=purchased',
-                    'pending_daily_week'   => $base_url . '/orders/daily?period=week&status=pending',
-                    'all_orders_daily'     => $base_url . '/orders/daily?period=week&status=all',
-                    'custom_range_daily'   => $base_url . '/orders/daily?date_from=2023-01-01&date_to=2023-01-31',
+                    'pending_daily_week' => $base_url . '/orders/daily?period=week&status=pending',
+                    'all_orders_daily' => $base_url . '/orders/daily?period=week&status=all',
+                    'custom_range_daily' => $base_url . '/orders/daily?date_from=2023-01-01&date_to=2023-01-31',
                 ),
             );
-            $docs['endpoints']['orders/sales/daily'] = array(
-                'url'         => $base_url . '/orders/sales/daily',
-                'method'      => 'GET',
+            $docs['endpoints']['orders/sales/daily'] = array (
+                'url' => $base_url . '/orders/sales/daily',
+                'method' => 'GET',
                 'description' => __('Get daily WooCommerce sales totals for a specific period (returns date => amount).', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'status'     => array('purchased', 'pending', 'all', 'any', 'completed', 'processing', 'on-hold', 'cancelled', 'refunded', 'failed'),
-                    'period'     => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'status' => array ('purchased', 'pending', 'all', 'any', 'completed', 'processing', 'on-hold', 'cancelled', 'refunded', 'failed'),
+                    'period' => array ('week', 'month', 'year', 'all'),
                     'start_date' => 'YYYY-MM-DD (or use date_from)',
-                    'end_date'   => 'YYYY-MM-DD (or use date_to)',
-                    'date_from'  => 'YYYY-MM-DD (alias for start_date)',
-                    'date_to'    => 'YYYY-MM-DD (alias for end_date)',
+                    'end_date' => 'YYYY-MM-DD (or use date_to)',
+                    'date_from' => 'YYYY-MM-DD (alias for start_date)',
+                    'date_to' => 'YYYY-MM-DD (alias for end_date)',
                 ),
-                'sample_queries' => array(
+                'sample_queries' => array (
                     'sales_daily_week' => $base_url . '/orders/sales/daily?period=week',
                     'sales_daily_month' => $base_url . '/orders/sales/daily?period=month',
                 ),
             );
-            $docs['endpoints']['orders/distribution'] = array(
-                'url'         => $base_url . '/orders/distribution',
-                'method'      => 'GET',
+            $docs['endpoints']['orders/distribution'] = array (
+                'url' => $base_url . '/orders/distribution',
+                'method' => 'GET',
                 'description' => __('Get distribution of WooCommerce orders by status (returns status => count).', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'period'     => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'period' => array ('week', 'month', 'year', 'all'),
                     'start_date' => 'YYYY-MM-DD (or use date_from)',
-                    'end_date'   => 'YYYY-MM-DD (or use date_to)',
-                    'date_from'  => 'YYYY-MM-DD (alias for start_date)',
-                    'date_to'    => 'YYYY-MM-DD (alias for end_date)',
+                    'end_date' => 'YYYY-MM-DD (or use date_to)',
+                    'date_from' => 'YYYY-MM-DD (alias for start_date)',
+                    'date_to' => 'YYYY-MM-DD (alias for end_date)',
                 ),
-                'sample_queries' => array(
-                    'distribution_week'  => $base_url . '/orders/distribution?period=week',
+                'sample_queries' => array (
+                    'distribution_week' => $base_url . '/orders/distribution?period=week',
                     'distribution_month' => $base_url . '/orders/distribution?period=month',
                 ),
             );
-            $docs['endpoints']['orders/daily-distribution'] = array(
-                'url'         => $base_url . '/orders/daily-distribution',
-                'method'      => 'GET',
+            $docs['endpoints']['orders/daily-distribution'] = array (
+                'url' => $base_url . '/orders/daily-distribution',
+                'method' => 'GET',
                 'description' => __('Get daily distribution of WooCommerce orders by status (returns date => { status => count }).', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'period'     => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'period' => array ('week', 'month', 'year', 'all'),
                     'start_date' => 'YYYY-MM-DD (or use date_from)',
-                    'end_date'   => 'YYYY-MM-DD (or use date_to)',
-                    'date_from'  => 'YYYY-MM-DD (alias for start_date)',
-                    'date_to'    => 'YYYY-MM-DD (alias for end_date)',
+                    'end_date' => 'YYYY-MM-DD (or use date_to)',
+                    'date_from' => 'YYYY-MM-DD (alias for start_date)',
+                    'date_to' => 'YYYY-MM-DD (alias for end_date)',
                 ),
-                'sample_queries' => array(
-                    'daily_distribution_week'  => $base_url . '/orders/daily-distribution?period=week',
+                'sample_queries' => array (
+                    'daily_distribution_week' => $base_url . '/orders/daily-distribution?period=week',
                     'daily_distribution_month' => $base_url . '/orders/daily-distribution?period=month',
                 ),
             );
-            $docs['endpoints']['conversion/daily'] = array(
-                'url'         => $base_url . '/conversion/daily',
-                'method'      => 'GET',
+            $docs['endpoints']['conversion/daily'] = array (
+                'url' => $base_url . '/conversion/daily',
+                'method' => 'GET',
                 'description' => __('Get daily conversion rate (orders / registrations * 100) for a specific period (returns date => rate).', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'status'     => array('purchased', 'pending', 'all', 'any', 'completed', 'processing', 'on-hold', 'cancelled', 'refunded', 'failed'),
-                    'period'     => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'status' => array ('purchased', 'pending', 'all', 'any', 'completed', 'processing', 'on-hold', 'cancelled', 'refunded', 'failed'),
+                    'period' => array ('week', 'month', 'year', 'all'),
                     'start_date' => 'YYYY-MM-DD (or use date_from)',
-                    'end_date'   => 'YYYY-MM-DD (or use date_to)',
-                    'date_from'  => 'YYYY-MM-DD (alias for start_date)',
-                    'date_to'    => 'YYYY-MM-DD (alias for end_date)',
+                    'end_date' => 'YYYY-MM-DD (or use date_to)',
+                    'date_from' => 'YYYY-MM-DD (alias for start_date)',
+                    'date_to' => 'YYYY-MM-DD (alias for end_date)',
                 ),
-                'sample_queries' => array(
-                    'conversion_week'  => $base_url . '/conversion/daily?period=week',
+                'sample_queries' => array (
+                    'conversion_week' => $base_url . '/conversion/daily?period=week',
                     'conversion_month' => $base_url . '/conversion/daily?period=month',
                 ),
             );
         }
 
         if (class_exists('Growtype_Affiliate')) {
-            $docs['endpoints']['affiliate/payouts'] = array(
-                'url'         => $base_url . '/affiliate/payouts',
-                'method'      => 'GET',
+            $docs['endpoints']['affiliate/payouts'] = array (
+                'url' => $base_url . '/affiliate/payouts',
+                'method' => 'GET',
                 'description' => __('Get total affiliate commissions grouped by referral source.', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'response_format' => array(
+                'response_format' => array (
                     'structure' => 'payouts: [ { source, total_earned, affiliate_name, affiliate_email, affiliate_id, total_user_paid }, ... ]',
-                    'notes'     => 'Calculates 40% for subscriptions and 30% for one-time orders by default. Total user paid is the manual adjustment from the user profile.',
+                    'notes' => 'Calculates 40% for subscriptions and 30% for one-time orders by default. Total user paid is the manual adjustment from the user profile.',
                 ),
-                'sample_queries' => array(
+                'sample_queries' => array (
                     'all_payouts' => $base_url . '/affiliate/payouts',
                 ),
             );
         }
 
         if (class_exists('Growtype_Quiz')) {
-            $docs['endpoints']['quiz/results'] = array(
-                'url'         => $base_url . '/quiz/results',
-                'method'      => 'GET',
+            $docs['endpoints']['quiz/results'] = array (
+                'url' => $base_url . '/quiz/results',
+                'method' => 'GET',
                 'description' => __('Get quiz results based on quiz_id or quiz_slug.', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'quiz_id'   => __('Filter by specific quiz ID.', 'growtype-analytics'),
+                'parameters' => array (
+                    'quiz_id' => __('Filter by specific quiz ID.', 'growtype-analytics'),
                     'quiz_slug' => __('Filter by specific quiz slug.', 'growtype-analytics'),
-                    'limit'     => __('Number of results to retrieve (default 20).', 'growtype-analytics'),
+                    'limit' => __('Number of results to retrieve (default 20).', 'growtype-analytics'),
                 ),
-                'sample_queries' => array(
-                    'by_id'   => $base_url . '/quiz/results?quiz_id=123',
+                'sample_queries' => array (
+                    'by_id' => $base_url . '/quiz/results?quiz_id=123',
                     'by_slug' => $base_url . '/quiz/results?quiz_slug=my-awesome-quiz',
                 ),
             );
         }
 
         if (class_exists('WooCommerce')) {
-            $docs['endpoints']['payments/gateways'] = array(
-                'url'         => $base_url . '/payments/gateways',
-                'method'      => 'GET',
+            $docs['endpoints']['payments/gateways'] = array (
+                'url' => $base_url . '/payments/gateways',
+                'method' => 'GET',
                 'description' => __('Get distribution of orders and revenue by payment gateway.', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'period'     => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'period' => array ('week', 'month', 'year', 'all'),
                     'start_date' => 'YYYY-MM-DD',
-                    'end_date'   => 'YYYY-MM-DD',
+                    'end_date' => 'YYYY-MM-DD',
                 ),
-                'sample_queries' => array(
+                'sample_queries' => array (
                     'gateways_this_month' => $base_url . '/payments/gateways?period=month',
                 ),
             );
-            $docs['endpoints']['payments/failures'] = array(
-                'url'         => $base_url . '/payments/failures',
-                'method'      => 'GET',
+            $docs['endpoints']['payments/failures'] = array (
+                'url' => $base_url . '/payments/failures',
+                'method' => 'GET',
                 'description' => __('Get failed payment statistics grouped by gateway.', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'period' => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'period' => array ('week', 'month', 'year', 'all'),
                 ),
-                'sample_queries' => array(
+                'sample_queries' => array (
                     'failures_this_month' => $base_url . '/payments/failures?period=month',
                 ),
             );
-            $docs['endpoints']['payments/success-rate'] = array(
-                'url'         => $base_url . '/payments/success-rate',
-                'method'      => 'GET',
+            $docs['endpoints']['payments/success-rate'] = array (
+                'url' => $base_url . '/payments/success-rate',
+                'method' => 'GET',
                 'description' => __('Get payment success rate (Completed vs Failed/Cancelled).', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'period'     => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'period' => array ('week', 'month', 'year', 'all'),
                     'start_date' => 'YYYY-MM-DD',
-                    'end_date'   => 'YYYY-MM-DD',
+                    'end_date' => 'YYYY-MM-DD',
                 ),
-                'sample_queries' => array(
+                'sample_queries' => array (
                     'success_rate_month' => $base_url . '/payments/success-rate?period=month',
                 ),
             );
         }
 
         if (class_exists('Growtype_Chat') && class_exists('WooCommerce')) {
-            $docs['endpoints']['characters/revenue'] = array(
-                'url'         => $base_url . '/characters/revenue',
-                'method'      => 'GET',
+            $docs['endpoints']['characters/revenue'] = array (
+                'url' => $base_url . '/characters/revenue',
+                'method' => 'GET',
                 'description' => __('Get revenue attribution for characters based on the last message before purchase.', 'growtype-analytics'),
                 'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
-                'parameters'  => array(
-                    'period'     => array('week', 'month', 'year', 'all'),
+                'parameters' => array (
+                    'period' => array ('week', 'month', 'year', 'all'),
                     'start_date' => 'YYYY-MM-DD',
-                    'end_date'   => 'YYYY-MM-DD',
-                    'limit'      => __('Limit the number of top characters to retrieve.', 'growtype-analytics'),
+                    'end_date' => 'YYYY-MM-DD',
+                    'limit' => __('Limit the number of top characters to retrieve.', 'growtype-analytics'),
                 ),
-                'sample_queries' => array(
+                'sample_queries' => array (
                     'revenue_top_10' => $base_url . '/characters/revenue?period=month&limit=10',
                 ),
             );
+
+            $docs['endpoints']['characters/conversion-rate'] = array (
+                'url' => $base_url . '/characters/conversion-rate',
+                'method' => 'GET',
+                'description' => __('Get conversion rate per character (Buyers / Unique Chatters).', 'growtype-analytics'),
+                'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+                'parameters' => array (
+                    'period' => array ('week', 'month', 'year', 'all'),
+                    'limit' => __('Number of top characters to return.', 'growtype-analytics'),
+                ),
+                'sample_queries' => array (
+                    'conversion_top_5' => $base_url . '/characters/conversion-rate?period=month&limit=5',
+                ),
+            );
         }
+
+        // --- NEW RETENTION ENDPOINTS ---
+        $docs['endpoints']['retention/activity-stats'] = array (
+            'url' => $base_url . '/retention/activity-stats',
+            'method' => 'GET',
+            'description' => __('Get DAU, WAU, MAU and Stickiness Ratio (DAU/MAU).', 'growtype-analytics'),
+            'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+            'sample_queries' => array (
+                'stickiness' => $base_url . '/retention/activity-stats',
+            ),
+        );
+
+        $docs['endpoints']['retention/cohorts'] = array (
+            'url' => $base_url . '/retention/cohorts',
+            'method' => 'GET',
+            'description' => __('Get cohort retention analysis. Shows % of users returning in subsequent intervals.', 'growtype-analytics'),
+            'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+            'parameters' => array (
+                'interval' => array ('week', 'month'),
+            ),
+            'sample_queries' => array (
+                'weekly_cohorts' => $base_url . '/retention/cohorts?interval=week',
+            ),
+        );
+
+        $docs['endpoints']['retention/churn-risk'] = array (
+            'url' => $base_url . '/retention/churn-risk',
+            'method' => 'GET',
+            'description' => __('Identify high-value users (historical spenders) who are inactive and at risk of churning.', 'growtype-analytics'),
+            'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+            'parameters' => array (
+                'days' => __('Number of inactivity days (default 14).', 'growtype-analytics'),
+                'limit' => __('Number of users to return.', 'growtype-analytics'),
+            ),
+            'sample_queries' => array (
+                'high_risk_14d' => $base_url . '/retention/churn-risk?days=14',
+            ),
+        );
+
+        // --- NEW ECONOMY ENDPOINTS ---
+        $docs['endpoints']['economy/credits'] = array (
+            'url' => $base_url . '/economy/credits',
+            'method' => 'GET',
+            'description' => __('Get aggregate credit economy stats: Total Purchased vs Total Unspent (Liability/Deferred Revenue).', 'growtype-analytics'),
+            'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+        );
+
+        $docs['endpoints']['economy/repurchase-rate'] = array (
+            'url' => $base_url . '/economy/repurchase-rate',
+            'method' => 'GET',
+            'description' => __('Get re-purchase rate (% of buyers who make more than one order).', 'growtype-analytics'),
+            'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+            'parameters' => array (
+                'period' => array ('week', 'month', 'year', 'all'),
+            ),
+            'sample_queries' => array (
+                'lifetime_repurchase' => $base_url . '/economy/repurchase-rate?period=all',
+            ),
+        );
+
+        $docs['endpoints']['economy/arpu'] = array (
+            'url' => $base_url . '/economy/arpu',
+            'method' => 'GET',
+            'description' => __('Get ARPU (Average Revenue Per User) and ARPPU (Average Revenue Per Paying User).', 'growtype-analytics'),
+            'permissions' => __('Manage Options (Admin)', 'growtype-analytics'),
+        );
 
         return new WP_REST_Response($docs, 200);
     }

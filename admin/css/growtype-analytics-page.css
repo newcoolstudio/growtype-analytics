@@ -65,11 +65,7 @@
     width: 100%;
 }
 
-.chart-loading-overlay,
-.registrations-chart-loading-overlay,
-.activation-chart-loading-overlay,
-.paywall-chart-loading-overlay,
-.retention-chart-loading-overlay {
+.analytics-chart-loading-overlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -138,6 +134,71 @@
     font-size: 32px;
     font-weight: 700;
     line-height: 1.2;
+}
+
+.analytics-scale-snapshot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-top: 18px;
+}
+
+.analytics-snapshot-card {
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.analytics-snapshot-card--good {
+    background: #edf7ed;
+    border-color: #4caf50;
+}
+
+.analytics-snapshot-card--bad {
+    background: #fef2f2;
+    border-color: #ef4444;
+}
+
+.analytics-snapshot-card__title {
+    color: #50575e;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.analytics-snapshot-card__value {
+    color: #1d2327;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 6px;
+}
+
+.analytics-snapshot-card__description {
+    color: #646970;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.analytics-snapshot-copy {
+    margin-top: 18px;
+}
+
+.analytics-snapshot-copy label {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.analytics-snapshot-copy textarea {
+    width: 100%;
+    min-height: 320px;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    resize: vertical;
 }
 
 /* Recent Events Table */

@@ -31,30 +31,22 @@ class Growtype_Analytics_Rest_Api_Characters
                 'callback'            => array($this, 'get_characters_revenue'),
                 'permission_callback' => array($this, 'get_characters_permissions_check'),
                 'args'                => array(
-                    'period' => array(
-                        'description' => __('The period for which to get the revenue (week, month, etc.).', 'growtype-analytics'),
-                        'type'        => 'string',
-                        'enum'        => array('week', 'month', 'year', 'all'),
-                        'required'    => false,
-                    ),
-                    'start_date' => array(
-                        'description' => __('The start date (YYYY-MM-DD).', 'growtype-analytics'),
-                        'type'        => 'string',
-                        'format'      => 'date',
-                        'required'    => false,
-                    ),
-                    'end_date' => array(
-                        'description' => __('The end date (YYYY-MM-DD).', 'growtype-analytics'),
-                        'type'        => 'string',
-                        'format'      => 'date',
-                        'required'    => false,
-                    ),
-                    'limit' => array(
-                        'description' => __('Limit the number of characters.', 'growtype-analytics'),
-                        'type'        => 'integer',
-                        'default'     => 10,
-                        'required'    => false,
-                    ),
+                    'period'     => array('type' => 'string', 'enum' => array('week', 'month', 'year', 'all')),
+                    'start_date' => array('type' => 'string', 'format' => 'date'),
+                    'end_date'   => array('type' => 'string', 'format' => 'date'),
+                    'limit'      => array('type' => 'integer', 'default' => 10),
+                ),
+            ),
+        ));
+
+        register_rest_route('growtype-analytics/v1', '/characters/conversion-rate', array(
+            array(
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => array($this, 'get_characters_conversion_rate'),
+                'permission_callback' => array($this, 'get_characters_permissions_check'),
+                'args'                => array(
+                    'period' => array('type' => 'string', 'enum' => array('week', 'month', 'year', 'all'), 'default' => 'month'),
+                    'limit'  => array('type' => 'integer', 'default' => 10),
                 ),
             ),
         ));
@@ -217,6 +209,112 @@ class Growtype_Analytics_Rest_Api_Characters
             'period' => $period,
             'start_date' => $start_date,
             'end_date' => $end_date
+        ), 200);
+    }
+
+    /**
+     * Get conversion rate per character (Buyers / Chatters).
+     */
+    public function get_characters_conversion_rate($request)
+    {
+        global $wpdb;
+
+        if (!class_exists('WooCommerce') || !class_exists('Growtype_Chat_Database')) {
+            return new WP_Error('plugin_not_found', __('Required plugins (WooCommerce/Chat) not active.', 'growtype-analytics'), array('status' => 404));
+        }
+
+        $period = $request->get_param('period') ?: 'month';
+        $limit = (int) $request->get_param('limit') ?: 10;
+
+        $messages_table = $wpdb->prefix . Growtype_Chat_Database::MESSAGES_TABLE;
+        $chat_users_table = $wpdb->prefix . Growtype_Chat_Database::USERS_TABLE;
+        $characters_table = $wpdb->prefix . 'characters';
+        $user_session_table = $wpdb->prefix . Growtype_Chat_Database::USER_SESSION_TABLE;
+
+        $date_condition = "AND m.created_at >= DATE_SUB(NOW(), INTERVAL 1 " . strtoupper($period) . ")";
+        if ($period === 'all') $date_condition = "";
+
+        // 1. Get unique chatters per character
+        // Logic: A chatter is a wp_user in a session where a bot (character) is present
+        $chatters_query = "
+            SELECT u_bot.external_id as character_id, COUNT(DISTINCT m.user_id) as total_chatters
+            FROM $messages_table m
+            JOIN {$wpdb->prefix}" . Growtype_Chat_Database::SESSION_MESSAGE_TABLE . " sm ON m.id = sm.message_id
+            JOIN $user_session_table us_bot ON sm.session_id = us_bot.session_id
+            JOIN $chat_users_table u_bot ON us_bot.user_id = u_bot.id
+            WHERE u_bot.type = 'bot'
+            $date_condition
+            GROUP BY character_id
+        ";
+
+        $chatters_results = $wpdb->get_results($chatters_query, OBJECT_K);
+
+        // 2. Get unique buyers per character
+        // Logic: Buyers (any status) who chatted with the character before purchase
+        $buyers_query = "
+            SELECT u_bot.external_id as character_id, COUNT(DISTINCT u_wp.ID) as total_buyers
+            FROM $messages_table m
+            JOIN {$wpdb->prefix}" . Growtype_Chat_Database::SESSION_MESSAGE_TABLE . " sm ON m.id = sm.message_id
+            JOIN $user_session_table us_bot ON sm.session_id = us_bot.session_id
+            JOIN $chat_users_table u_bot ON us_bot.user_id = u_bot.id
+            JOIN $chat_users_table u_chat ON m.user_id = u_chat.id
+            JOIN {$wpdb->users} u_wp ON u_chat.external_id = u_wp.ID
+            JOIN {$wpdb->postmeta} pm_order ON u_wp.ID = pm_order.meta_value AND pm_order.meta_key = '_customer_user'
+            JOIN {$wpdb->posts} p_order ON pm_order.post_id = p_order.ID AND p_order.post_status IN ('wc-completed', 'wc-processing')
+            WHERE u_bot.type = 'bot' AND u_chat.type = 'wp_user'
+            AND m.created_at <= p_order.post_date
+            $date_condition
+            GROUP BY character_id
+        ";
+
+        $buyers_results = $wpdb->get_results($buyers_query, OBJECT_K);
+
+        $conversion_data = [];
+        foreach ($chatters_results as $char_id => $data) {
+            $chatters = (int) $data->total_chatters;
+            $buyers = isset($buyers_results[$char_id]) ? (int) $buyers_results[$char_id]->total_buyers : 0;
+            
+            $rate = ($chatters > 0) ? round(($buyers / $chatters) * 100, 2) : 0;
+
+            $conversion_data[$char_id] = [
+                'character_id'    => $char_id,
+                'chatters_count'  => $chatters,
+                'buyers_count'    => $buyers,
+                'conversion_rate' => $rate . '%',
+                'name'            => null,
+                'slug'            => null
+            ];
+        }
+
+        // Sort by conversion rate
+        uasort($conversion_data, function($a, $b) {
+            return (float)$b['conversion_rate'] <=> (float)$a['conversion_rate'];
+        });
+
+        $top_chars = array_slice($conversion_data, 0, $limit, true);
+        
+        // Resolve names/slugs
+        if (!empty($top_chars)) {
+            $char_ids = array_keys($top_chars);
+            $placeholders = implode(',', array_fill(0, count($char_ids), '%s'));
+            $char_info = $wpdb->get_results($wpdb->prepare(
+                "SELECT external_id, slug, metadata FROM $characters_table WHERE external_id IN ($placeholders)",
+                ...$char_ids
+            ));
+
+            foreach ($char_info as $info) {
+                if (isset($top_chars[$info->external_id])) {
+                    $top_chars[$info->external_id]['slug'] = $info->slug;
+                    $metadata = json_decode($info->metadata, true);
+                    $top_chars[$info->external_id]['name'] = $metadata['details']['character_title'] ?? $info->slug;
+                }
+            }
+        }
+
+        return new WP_REST_Response(array(
+            'period'           => $period,
+            'characters'       => array_values($top_chars),
+            'global_note'      => __('Higher conversion rate characters should be prioritized in marketing.', 'growtype-analytics')
         ), 200);
     }
 }

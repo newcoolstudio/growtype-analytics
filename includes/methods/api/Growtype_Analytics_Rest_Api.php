@@ -52,6 +52,21 @@ class Growtype_Analytics_Rest_Api
     private $characters_api;
 
     /**
+     * @var Growtype_Analytics_Rest_Api_Retention
+     */
+    private $retention_api;
+
+    /**
+     * @var Growtype_Analytics_Rest_Api_Economy
+     */
+    private $economy_api;
+
+    /**
+     * @var Growtype_Analytics_Rest_Api_Sharing
+     */
+    private $sharing_api;
+
+    /**
      * Initialize the class and set its properties.
      */
     public function __construct()
@@ -87,5 +102,14 @@ class Growtype_Analytics_Rest_Api
 
         require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/api/partials/Growtype_Analytics_Rest_Api_Characters.php';
         $this->characters_api = new Growtype_Analytics_Rest_Api_Characters();
+
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/api/partials/Growtype_Analytics_Rest_Api_Retention.php';
+        $this->retention_api = new Growtype_Analytics_Rest_Api_Retention();
+
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/api/partials/Growtype_Analytics_Rest_Api_Economy.php';
+        $this->economy_api = new Growtype_Analytics_Rest_Api_Economy();
+
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/api/partials/Growtype_Analytics_Rest_Api_Sharing.php';
+        $this->sharing_api = new Growtype_Analytics_Rest_Api_Sharing();
     }
 }
