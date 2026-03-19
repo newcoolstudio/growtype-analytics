@@ -42,6 +42,18 @@ class Growtype_Analytics_Rest_Api_Sharing
                 ),
             ),
         ));
+        
+        register_rest_route('growtype-analytics/v1', '/shared-report/(?P<token>[A-Za-z0-9]+)/fragment/(?P<fragment>[A-Za-z0-9_]+)', array(
+            'methods'  => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_shared_report_fragment'),
+            'permission_callback' => '__return_true', // Standard public access
+            'args' => array(
+                'clear_cache' => array(
+                    'default' => false,
+                    'sanitize_callback' => array($this, 'sanitize_clear_cache'),
+                ),
+            ),
+        ));
     }
 
     public function sanitize_content_format($value)
@@ -89,11 +101,61 @@ class Growtype_Analytics_Rest_Api_Sharing
             header('Content-Type: text/html; charset=' . get_bloginfo('charset'));
             header('Access-Control-Allow-Origin: *'); // Allow from anywhere
             header('X-Robots-Tag: noindex, nofollow');
+
+            // Release session lock to prevent blocking other requests from the same user
+            if (session_id()) {
+                session_write_close();
+            }
+
+            // Increase time limit for large reports
+            @set_time_limit(300);
+
             $shared_report_page->render_page($matched_link, 'html');
             exit;
         }
 
+        // Release session lock for REST requests too
+        if (session_id()) {
+            session_write_close();
+        }
+
+        @set_time_limit(300);
+
         $data = $shared_report_page->render_page($matched_link, 'json');
+        $response = rest_ensure_response($data);
+        $response->header('Access-Control-Allow-Origin', '*');
+        $response->header('X-Robots-Tag', 'noindex, nofollow');
+        
+        return $response;
+    }
+
+    public function get_shared_report_fragment(WP_REST_Request $request)
+    {
+        $token = sanitize_text_field($request->get_param('token'));
+        $fragment = sanitize_key($request->get_param('fragment'));
+        $content_format = $this->sanitize_content_format($request->get_param('content_format'));
+        $clear_cache = $this->sanitize_clear_cache($request->get_param('clear_cache'));
+        $matched_link = $this->find_share_link($token);
+
+        if (empty($matched_link)) {
+            return new WP_Error('growtype_analytics_invalid_share_link', __('Invalid shared analytics access URL.', 'growtype-analytics'), array('status' => 404));
+        }
+
+        if (!class_exists('Growtype_Analytics_Admin_Page')) {
+            require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/Growtype_Analytics_Admin_Page.php';
+        }
+
+        $report = new Growtype_Analytics_Admin_Page(false);
+        $shared_report_page = $report->get_shared_report_page();
+
+        $data = $shared_report_page->get_fragment($fragment, $matched_link, $clear_cache);
+
+        if ($content_format === 'html') {
+            $data = array(
+                'html' => $shared_report_page->render_fragment_html($fragment, $data)
+            );
+        }
+        
         $response = rest_ensure_response($data);
         $response->header('Access-Control-Allow-Origin', '*');
         $response->header('X-Robots-Tag', 'noindex, nofollow');

@@ -58,6 +58,11 @@ define('GROWTYPE_ANALYTICS_URL', plugin_dir_url(__FILE__));
 define('GROWTYPE_ANALYTICS_URL_PUBLIC', plugin_dir_url(__FILE__) . 'public/');
 
 /**
+ * Cache time
+ */
+define('GROWTYPE_ANALYTICS_CACHE_TIME', 12 * HOUR_IN_SECONDS);
+
+/**
  * The code that runs during plugin activation.
  * This action is documented in includes/class-growtype-analytics-activator.php
  */

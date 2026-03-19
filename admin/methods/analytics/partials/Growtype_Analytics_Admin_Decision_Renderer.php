@@ -19,9 +19,11 @@ class Growtype_Analytics_Admin_Decision_Renderer
         $this->page = $page;
     }
 
-    public function render_analytics_snapshot()
+    public function render_analytics_snapshot($metrics = null)
     {
-        $metrics = $this->page->get_snapshot_metrics();
+        if ($metrics === null) {
+            $metrics = $this->page->get_snapshot_metrics();
+        }
         $growth_sign_revenue = $metrics['revenue_growth_mom'] >= 0 ? '+' : '';
         $growth_sign_users = $metrics['new_users_growth_wow'] >= 0 ? '+' : '';
         $summary_lines = array(
@@ -94,15 +96,20 @@ class Growtype_Analytics_Admin_Decision_Renderer
         <?php
     }
 
-    public function render_execution_kpis()
+    public function render_execution_kpis($data = null)
     {
-        $metrics = $this->page->get_snapshot_metrics();
+        if ($data === null) {
+            $metrics = $this->page->get_snapshot_metrics();
+            $failure_segments = $this->page->get_payment_failure_segments_data($metrics['settings'], 30, 25);
+        } else {
+            $metrics = $data;
+            $failure_segments = $data['payment_failure_segments'];
+        }
         $targets = array(
             'payment_success_rate_30d' => 45.0,
             'new_user_to_buyer_conversion_30d' => 2.5,
             'repurchase_rate_total' => 25.0,
         );
-        $failure_segments = $this->page->get_payment_failure_segments_data($metrics['settings'], 30, 25);
 
         $summary_lines = array(
             'Snapshot generated: ' . current_time('mysql'),

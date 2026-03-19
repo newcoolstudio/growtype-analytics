@@ -26,9 +26,14 @@ class Growtype_Analytics_Admin_Metrics
         delete_transient('growtype_analytics_snapshot_metrics_v1');
     }
 
-    public function get_scale_or_pivot_metrics()
+    public function get_scale_or_pivot_metrics($refresh = false)
     {
         $transient_key = 'growtype_analytics_snapshot_metrics_v1';
+        
+        if ($refresh) {
+            delete_transient($transient_key);
+        }
+
         $cached = get_transient($transient_key);
         if ($cached !== false) {
             return $cached;
@@ -187,7 +192,7 @@ class Growtype_Analytics_Admin_Metrics
         // Daily Revenue Trend for the last 30d
         $metrics['revenue_daily_30d'] = $this->get_revenue_trend_daily(30, $settings);
 
-        set_transient($transient_key, $metrics, 10 * MINUTE_IN_SECONDS);
+        set_transient($transient_key, $metrics, GROWTYPE_ANALYTICS_CACHE_TIME);
 
         return $metrics;
     }
@@ -997,13 +1002,13 @@ class Growtype_Analytics_Admin_Metrics
 
         return array_map(function ($source) {
             return array(
-                $source['source'],
-                $this->controller->format_number($source['new_buyers']),
-                $this->controller->format_number($source['buyers_active_30d']),
-                $this->controller->format_money($source['revenue_30d']),
-                $this->controller->format_money($source['cost_30d']),
-                $this->controller->format_money($source['cac']),
-                $source['cost_30d'] > 0 ? round($source['roas'], 2) . 'x' : __('N/A', 'growtype-analytics'),
+                'source' => $source['source'],
+                'new_buyers_30d' => $this->controller->format_number($source['new_buyers']),
+                'active_buyers_30d' => $this->controller->format_number($source['buyers_active_30d']),
+                'revenue_30d' => $this->controller->format_money($source['revenue_30d']),
+                'cost_30d' => $this->controller->format_money($source['cost_30d']),
+                'cac' => $this->controller->format_money($source['cac']),
+                'roas' => $source['cost_30d'] > 0 ? round($source['roas'], 2) . 'x' : __('N/A', 'growtype-analytics'),
             );
         }, $sources);
     }
@@ -1050,13 +1055,13 @@ class Growtype_Analytics_Admin_Metrics
             $buyers = max(1, (int)$source['buyers']);
 
             return array(
-                $source['source'],
-                $this->controller->format_number($source['buyers']),
-                $this->controller->format_number($source['repeat_30d']),
-                $this->controller->format_percent(($source['repeat_30d'] / $buyers) * 100),
-                $this->controller->format_number($source['active_30d']),
-                $this->controller->format_percent(($source['active_30d'] / $buyers) * 100),
-                $this->controller->format_money($source['revenue'] / $buyers),
+                'source' => $source['source'],
+                'buyers' => $this->controller->format_number($source['buyers']),
+                'repeat_count_30d' => $this->controller->format_number($source['repeat_30d']),
+                'repeat_rate_30d' => $this->controller->format_percent(($source['repeat_30d'] / $buyers) * 100),
+                'active_30d' => $this->controller->format_number($source['active_30d']),
+                'active_rate_30d' => $this->controller->format_percent(($source['active_30d'] / $buyers) * 100),
+                'arppu' => $this->controller->format_money($source['revenue'] / $buyers),
             );
         }, $sources);
     }
@@ -1163,13 +1168,13 @@ class Growtype_Analytics_Admin_Metrics
         foreach ($offers as $offer_name => $offer) {
             $buyers_count = max(1, (int)$offer['buyers']);
             $formatted[] = array(
-                $offer_name,
-                $this->controller->format_number($offer['buyers']),
-                $this->controller->format_number($offer['repeat_30d']),
-                $this->controller->format_percent(($offer['repeat_30d'] / $buyers_count) * 100),
-                $this->controller->format_number($offer['repeat_ever']),
-                $this->controller->format_percent(($offer['repeat_ever'] / $buyers_count) * 100),
-                $this->controller->format_money($offer['revenue'] / $buyers_count),
+                'offer_name' => $offer_name,
+                'buyers' => $this->controller->format_number($offer['buyers']),
+                'repeat_30d' => $this->controller->format_number($offer['repeat_30d']),
+                'repeat_rate_30d' => $this->controller->format_percent(($offer['repeat_30d'] / $buyers_count) * 100),
+                'repeat_ever' => $this->controller->format_number($offer['repeat_ever']),
+                'repeat_rate_ever' => $this->controller->format_percent(($offer['repeat_ever'] / $buyers_count) * 100),
+                'arppu' => $this->controller->format_money($offer['revenue'] / $buyers_count),
             );
         }
 
@@ -1355,12 +1360,12 @@ class Growtype_Analytics_Admin_Metrics
             $gross_revenue_per_new_buyer = $source['revenue_30d'] / $new_buyers;
 
             return array(
-                $source['source'],
-                $this->controller->format_number($source['new_buyers']),
-                $this->controller->format_money($source['revenue_30d']),
-                $this->controller->format_money($source['revenue_total']),
-                $this->controller->format_money($gross_revenue_per_new_buyer),
-                $source['cost_30d'] > 0 ? $source['payback_months_estimate'] . ' mo' : __('N/A', 'growtype-analytics'),
+                'source' => $source['source'],
+                'new_buyers' => $this->controller->format_number($source['new_buyers']),
+                'revenue_30d' => $this->controller->format_money($source['revenue_30d']),
+                'revenue_total' => $this->controller->format_money($source['revenue_total']),
+                'revenue_per_new_buyer' => $this->controller->format_money($gross_revenue_per_new_buyer),
+                'payback_estimate' => $source['cost_30d'] > 0 ? $source['payback_months_estimate'] . ' mo' : __('N/A', 'growtype-analytics'),
             );
         }, $sources);
     }
@@ -1404,10 +1409,10 @@ class Growtype_Analytics_Admin_Metrics
             $buyers = (int)$row['buyers'];
 
             return array(
-                $row['locale_code'],
-                $this->controller->format_number($registered),
-                $this->controller->format_number($buyers),
-                $this->controller->format_percent($registered > 0 ? ($buyers / $registered) * 100 : 0),
+                'locale' => $row['locale_code'],
+                'registered' => $this->controller->format_number($registered),
+                'buyers' => $this->controller->format_number($buyers),
+                'conversion_rate' => $this->controller->format_percent($registered > 0 ? ($buyers / $registered) * 100 : 0),
             );
         }, $results ?: array());
     }
@@ -1622,12 +1627,12 @@ class Growtype_Analytics_Admin_Metrics
         foreach ($character_rows as $character) {
             $buyers = count($character['buyers']);
             $formatted[] = array(
-                $character['name'] ?: $character['slug'] ?: __('Unknown', 'growtype-analytics'),
-                $character['slug'] ?: 'unknown',
-                $this->controller->format_money($character['revenue']),
-                $this->controller->format_number($character['orders']),
-                $this->controller->format_number($buyers),
-                $this->controller->format_money($buyers > 0 ? ($character['revenue'] / $buyers) : 0),
+                'character_name' => $character['name'] ?: $character['slug'] ?: __('Unknown', 'growtype-analytics'),
+                'slug' => $character['slug'] ?: 'unknown',
+                'revenue' => $this->controller->format_money($character['revenue']),
+                'orders' => $this->controller->format_number($character['orders']),
+                'buyers' => $this->controller->format_number($buyers),
+                'revenue_per_buyer' => $this->controller->format_money($buyers > 0 ? ($character['revenue'] / $buyers) : 0),
             );
         }
 

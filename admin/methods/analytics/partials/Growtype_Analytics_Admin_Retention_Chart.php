@@ -61,7 +61,7 @@ class Growtype_Analytics_Admin_Retention_Chart
 
         if (false === $data) {
             $data = $this->get_user_retention_data($days);
-            set_transient($cache_key, $data, HOUR_IN_SECONDS);
+            set_transient($cache_key, $data, GROWTYPE_ANALYTICS_CACHE_TIME);
         }
 
         wp_send_json_success(array(

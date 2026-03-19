@@ -50,12 +50,12 @@ class Growtype_Analytics_Admin_Page_Offer_Tests extends Growtype_Analytics_Admin
             $revenue = (float)($row['revenue'] ?: 0);
 
             return array(
-                $row['offer_name'] ?: 'unknown',
-                $this->controller->format_number($paid_orders),
-                $this->controller->format_number($failed_orders),
-                $this->controller->format_percent($attempts > 0 ? ($paid_orders / $attempts) * 100 : 0),
-                $this->controller->format_money($revenue),
-                $this->controller->format_money($paid_orders > 0 ? $revenue / $paid_orders : 0),
+                'offer_name' => $row['offer_name'] ?: 'unknown',
+                'paid_orders' => $this->controller->format_number($paid_orders),
+                'failed_orders' => $this->controller->format_number($failed_orders),
+                'success_rate' => $this->controller->format_percent($attempts > 0 ? ($paid_orders / $attempts) * 100 : 0),
+                'revenue' => $this->controller->format_money($revenue),
+                'avg_revenue_per_order' => $this->controller->format_money($paid_orders > 0 ? $revenue / $paid_orders : 0),
             );
         }, $results ?: array());
     }

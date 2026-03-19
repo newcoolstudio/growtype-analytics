@@ -2,9 +2,9 @@
 
 trait Growtype_Analytics_Admin_Page_Metrics_Trait
 {
-    public function get_snapshot_metrics()
+    public function get_snapshot_metrics($refresh = false)
     {
-        return $this->metrics->get_scale_or_pivot_metrics();
+        return $this->metrics->get_scale_or_pivot_metrics($refresh);
     }
 
     public function get_snapshot_settings()

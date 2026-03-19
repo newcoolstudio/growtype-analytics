@@ -44,14 +44,14 @@ class Growtype_Analytics_Admin_Page_Source_Attribution extends Growtype_Analytic
             $revenue = (float)($row['revenue'] ?: 0);
 
             return array(
-                $row['source_type'],
-                $row['source'],
-                $row['campaign'],
-                $this->controller->format_number($paid_orders),
-                $this->controller->format_number($attempts),
-                $this->controller->format_percent($attempts > 0 ? ($paid_orders / $attempts) * 100 : 0),
-                $this->controller->format_money($revenue),
-                $this->controller->format_money($paid_orders > 0 ? $revenue / $paid_orders : 0),
+                'source_type' => $row['source_type'],
+                'source' => $row['source'],
+                'campaign' => $row['campaign'],
+                'paid_orders' => $this->controller->format_number($paid_orders),
+                'attempts' => $this->controller->format_number($attempts),
+                'success_rate' => $this->controller->format_percent($attempts > 0 ? ($paid_orders / $attempts) * 100 : 0),
+                'revenue' => $this->controller->format_money($revenue),
+                'aov' => $this->controller->format_money($paid_orders > 0 ? $revenue / $paid_orders : 0),
             );
         }, $results ?: array());
     }

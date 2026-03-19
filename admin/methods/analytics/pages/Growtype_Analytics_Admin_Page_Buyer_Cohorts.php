@@ -71,12 +71,12 @@ class Growtype_Analytics_Admin_Page_Buyer_Cohorts extends Growtype_Analytics_Adm
         foreach ($cohorts as $cohort => $data) {
             $buyers_count = max(1, $data['buyers']);
             $rows[] = array(
-                $cohort,
-                $this->controller->format_number($data['buyers']),
-                $this->controller->format_number($data['repeat_30d']),
-                $this->controller->format_percent(($data['repeat_30d'] / $buyers_count) * 100),
-                $this->controller->format_money($data['revenue']),
-                $this->controller->format_money($data['revenue'] / $buyers_count),
+                'cohort' => $cohort,
+                'buyers' => $this->controller->format_number($data['buyers']),
+                'repeat_30d' => $this->controller->format_number($data['repeat_30d']),
+                'repeat_rate_30d' => $this->controller->format_percent(($data['repeat_30d'] / $buyers_count) * 100),
+                'revenue' => $this->controller->format_money($data['revenue']),
+                'arppu' => $this->controller->format_money($data['revenue'] / $buyers_count),
             );
         }
 
