@@ -31,13 +31,17 @@ class Growtype_Analytics_Database
     /**
      * Check if table needs to be created or updated
      */
-    public function maybe_create_table()
+    public static function maybe_create_table()
     {
+        global $wpdb;
+        $table_name = $wpdb->prefix . self::TABLE_NAME;
+        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_name)) === $table_name;
+
         $version = get_option('growtype_analytics_db_version', '0');
         $current_version = '1.3'; // Increment this when schema changes
 
-        if ($version !== $current_version) {
-            $this->create_tracking_table();
+        if (!$table_exists || $version !== $current_version) {
+            self::create_tracking_table();
             update_option('growtype_analytics_db_version', $current_version);
         }
     }
@@ -45,7 +49,7 @@ class Growtype_Analytics_Database
     /**
      * Create the universal tracking table
      */
-    public function create_tracking_table()
+    public static function create_tracking_table()
     {
         global $wpdb;
         $table_name = $wpdb->prefix . self::TABLE_NAME;

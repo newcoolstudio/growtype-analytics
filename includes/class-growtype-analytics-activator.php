@@ -32,6 +32,9 @@ class Growtype_Analytics_Activator
      */
     public static function activate()
     {
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/database/Growtype_Analytics_Database.php';
+        Growtype_Analytics_Database::init();
+
         global $wp_rewrite;
         $wp_rewrite->flush_rules();
     }

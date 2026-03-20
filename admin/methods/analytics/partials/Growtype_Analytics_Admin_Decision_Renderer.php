@@ -443,8 +443,9 @@ class Growtype_Analytics_Admin_Decision_Renderer
             'user_try_to_buy_rate' => array (
                 'title' => sprintf(__('User -> Attempt (%sd)', 'growtype-analytics'), $pd),
                 'value' => $this->page->format_percent($user_try_rate),
-                'desc' => __('Percentage of registered users who initiated a checkout.', 'growtype-analytics'),
-                'is_good' => $user_try_rate >= 10.0
+                'desc' => sprintf(__('Goal: > %s', 'growtype-analytics'), $targets['user_try_to_buy_rate'] . '%'),
+                'is_good' => $user_try_rate >= $targets['user_try_to_buy_rate'],
+                'tooltip' => __('Percentage of registered users who initiated a checkout.', 'growtype-analytics')
             ),
         );
 
