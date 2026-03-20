@@ -2,9 +2,9 @@
 
 trait Growtype_Analytics_Admin_Page_Metrics_Trait
 {
-    public function get_snapshot_metrics($refresh = false)
+    public function get_snapshot_metrics($refresh = false, $period = 30)
     {
-        return $this->metrics->get_scale_or_pivot_metrics($refresh);
+        return $this->metrics->get_scale_or_pivot_metrics($refresh, $period);
     }
 
     public function get_snapshot_settings()
@@ -67,8 +67,4 @@ trait Growtype_Analytics_Admin_Page_Metrics_Trait
         return $this->metrics->get_growth_trends_data($days);
     }
 
-    public function get_top_characters_by_revenue_data($days = 30, $limit = 10)
-    {
-        return $this->metrics->get_top_characters_by_revenue_data($days, $limit);
-    }
 }

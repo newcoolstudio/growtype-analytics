@@ -16,14 +16,20 @@ class Growtype_Analytics_Admin_Funnel
         $this->controller = $controller;
     }
 
-    public function get_funnel_dropoff_data()
+    public function get_funnel_dropoff_data($period = null)
     {
         $settings = $this->controller->get_snapshot_settings();
 
-        return array(
+        $data = array(
             '7d' => $this->get_funnel_dropoff_metrics(7, $settings),
             '30d' => $this->get_funnel_dropoff_metrics(30, $settings),
         );
+
+        if ($period) {
+            $data['selected'] = $this->get_funnel_dropoff_metrics($period, $settings);
+        }
+
+        return $data;
     }
 
     public function get_funnel_dropoff_metrics($days, $settings)
@@ -55,6 +61,9 @@ class Growtype_Analytics_Admin_Funnel
             $query .= ", 0 as activated";
         }
 
+        $period_sql_u2 = $this->controller->metrics->build_period_sql('u2.user_registered', $days);
+        $period_sql_u = $this->controller->metrics->build_period_sql('u.user_registered', $days);
+
         $query .= " FROM `{$wpdb->users}` u
                 LEFT JOIN `{$wpdb->postmeta}` customer ON customer.meta_key = '_customer_user' AND customer.meta_value = u.ID
                 LEFT JOIN `{$wpdb->posts}` p_attempt ON p_attempt.ID = customer.post_id AND p_attempt.post_type = 'shop_order' AND p_attempt.post_status IN ($attempt_placeholders)
@@ -67,7 +76,7 @@ class Growtype_Analytics_Admin_Funnel
                             FROM `{$chat_messages_table}` m
                             INNER JOIN `{$chat_users_table}` cu2 ON cu2.id = m.user_id AND cu2.type = 'wp_user'
                             INNER JOIN `{$wpdb->users}` u2 ON u2.ID = cu2.external_id
-                            WHERE u2.user_registered >= DATE_SUB(NOW(), INTERVAL %d DAY)
+                            WHERE 1=1 {$period_sql_u2['sql']}
                             AND m.created_at >= u2.user_registered
                             AND m.created_at < DATE_ADD(u2.user_registered, INTERVAL %d DAY)
                             GROUP BY m.user_id
@@ -75,14 +84,14 @@ class Growtype_Analytics_Admin_Funnel
                         ) active_users ON active_users.user_id = cu.id";
         }
 
-        $query .= " WHERE u.user_registered >= DATE_SUB(NOW(), INTERVAL %d DAY)
+        $query .= " WHERE 1=1 {$period_sql_u['sql']}
                 {$email_exclusion['sql']}";
 
         $params = array_merge($attempt_statuses, $paid_statuses);
         if ($has_chat) {
-            $params = array_merge($params, array((int)$days, (int)$activation_window_days, (int)$activation_min_messages));
+            $params = array_merge($params, $period_sql_u2['params'], array((int)$activation_window_days, (int)$activation_min_messages));
         }
-        $params = array_merge($params, array((int)$days), $email_exclusion['params']);
+        $params = array_merge($params, $period_sql_u['params'], $email_exclusion['params']);
 
         $metrics = $wpdb->get_row($this->controller->prepare_dynamic_query($query, $params), ARRAY_A);
 
@@ -91,12 +100,7 @@ class Growtype_Analytics_Admin_Funnel
         $attempts = (int)($metrics['attempts'] ?? 0);
         $paid = (int)($metrics['paid'] ?? 0);
 
-        $stages = array(
-            array('label' => 'Registered', 'count' => $registered),
-            array('label' => 'Activated', 'count' => $activated),
-            array('label' => 'Checkout Attempt', 'count' => $attempts),
-            array('label' => 'Paid', 'count' => $paid),
-        );
+        $stages = $this->get_funnel_stages($registered, $activated, $attempts, $paid);
 
         $first = max(1, $registered);
         $previous = null;
@@ -120,17 +124,28 @@ class Growtype_Analytics_Admin_Funnel
         return array('rows' => $rows, 'activated' => $activated, 'registered' => $registered);
     }
 
+    public function get_funnel_stages($registered, $activated, $attempts, $paid)
+    {
+        return array(
+            array('label' => __('Registered', 'growtype-analytics'), 'count' => $registered),
+            array('label' => __('> 3 messages', 'growtype-analytics'), 'count' => $activated),
+            array('label' => __('Checkout Attempt', 'growtype-analytics'), 'count' => $attempts),
+            array('label' => __('Paid', 'growtype-analytics'), 'count' => $paid),
+        );
+    }
+
     public function get_new_user_attempt_count($days, $settings)
     {
         global $wpdb;
 
         $attempt_placeholders = implode(',', array_fill(0, count($settings['attempt_statuses']), '%s'));
         $email_exclusion = $this->controller->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
+        $period_sql = $this->controller->metrics->build_period_sql('u.user_registered', $days);
         $query = "SELECT COUNT(DISTINCT u.ID)
             FROM $wpdb->users u
             INNER JOIN $wpdb->postmeta customer ON customer.meta_key = '_customer_user' AND customer.meta_value = u.ID
             INNER JOIN $wpdb->posts p ON p.ID = customer.post_id
-            WHERE u.user_registered >= DATE_SUB(NOW(), INTERVAL %d DAY)
+            WHERE 1=1 {$period_sql['sql']}
             AND p.post_type = 'shop_order'
             AND p.post_status IN ($attempt_placeholders)
             {$email_exclusion['sql']}";
@@ -138,7 +153,7 @@ class Growtype_Analytics_Admin_Funnel
         return (int)$wpdb->get_var(
             $this->controller->prepare_dynamic_query(
                 $query,
-                array_merge(array((int)$days), $settings['attempt_statuses'], $email_exclusion['params'])
+                array_merge($period_sql['params'], $settings['attempt_statuses'], $email_exclusion['params'])
             )
         );
     }
@@ -149,11 +164,12 @@ class Growtype_Analytics_Admin_Funnel
 
         $paid_placeholders = implode(',', array_fill(0, count($settings['paid_statuses']), '%s'));
         $email_exclusion = $this->controller->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
+        $period_sql = $this->controller->metrics->build_period_sql('u.user_registered', $days);
         $query = "SELECT COUNT(DISTINCT u.ID)
             FROM $wpdb->users u
             INNER JOIN $wpdb->postmeta customer ON customer.meta_key = '_customer_user' AND customer.meta_value = u.ID
             INNER JOIN $wpdb->posts p ON p.ID = customer.post_id
-            WHERE u.user_registered >= DATE_SUB(NOW(), INTERVAL %d DAY)
+            WHERE 1=1 {$period_sql['sql']}
             AND p.post_type = 'shop_order'
             AND p.post_status IN ($paid_placeholders)
             {$email_exclusion['sql']}";
@@ -161,23 +177,23 @@ class Growtype_Analytics_Admin_Funnel
         return (int)$wpdb->get_var(
             $this->controller->prepare_dynamic_query(
                 $query,
-                array_merge(array((int)$days), $settings['paid_statuses'], $email_exclusion['params'])
+                array_merge($period_sql['params'], $settings['paid_statuses'], $email_exclusion['params'])
             )
         );
     }
 
-    public function get_new_users_count($days, $settings)
+    public function get_new_users_count($period, $settings)
     {
         global $wpdb;
-
         $email_exclusion = $this->controller->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
+        $period_sql = $this->controller->metrics->build_period_sql('u.user_registered', $period);
         $query = "SELECT COUNT(u.ID)
             FROM $wpdb->users u
-            WHERE u.user_registered >= DATE_SUB(NOW(), INTERVAL %d DAY)
+            WHERE 1=1 {$period_sql['sql']}
             {$email_exclusion['sql']}";
 
         return (int)$wpdb->get_var(
-            $this->controller->prepare_dynamic_query($query, array_merge(array((int)$days), $email_exclusion['params']))
+            $this->controller->prepare_dynamic_query($query, array_merge($period_sql['params'], $email_exclusion['params']))
         );
     }
 
@@ -204,11 +220,13 @@ class Growtype_Analytics_Admin_Funnel
         );
     }
 
-    public function get_activation_metrics($days, $settings)
+    public function get_activation_metrics($period, $settings)
     {
         global $wpdb;
 
-        $registered = $this->get_new_users_count($days, $settings);
+        $period_sql = $this->controller->metrics->build_period_sql('u.user_registered', $period);
+        $period_sql_u2 = $this->controller->metrics->build_period_sql('u2.user_registered', $period);
+        $registered = $this->get_new_users_count($period, $settings);
 
         if ($registered === 0) {
             return array('registered' => 0, 'activated' => 0, 'rate' => 0);
@@ -233,20 +251,20 @@ class Growtype_Analytics_Admin_Funnel
                 FROM $chat_messages_table m
                 INNER JOIN $chat_users_table cu2 ON cu2.id = m.user_id AND cu2.type = 'wp_user'
                 INNER JOIN $wpdb->users u2 ON u2.ID = cu2.external_id
-                WHERE u2.user_registered >= DATE_SUB(NOW(), INTERVAL %d DAY)
+                WHERE 1=1 {$period_sql_u2['sql']}
                 AND m.created_at >= u2.user_registered
                 AND m.created_at < DATE_ADD(u2.user_registered, INTERVAL %d DAY)
                 GROUP BY m.user_id
                 HAVING COUNT(*) >= %d
             ) active_users ON active_users.user_id = cu.id
-            WHERE u.user_registered >= DATE_SUB(NOW(), INTERVAL %d DAY)
+            WHERE 1=1 {$period_sql['sql']}
             {$email_exclusion['sql']}";
 
         $activated = (int)$wpdb->get_var(
             $this->controller->prepare_dynamic_query(
                 $query,
                 array_merge(
-                    array((int)$days, (int)$activation_window_days, (int)$activation_min_messages, (int)$days),
+                    $period_sql_u2['params'], array((int)$activation_window_days, (int)$activation_min_messages), $period_sql['params'],
                     $email_exclusion['params']
                 )
             )

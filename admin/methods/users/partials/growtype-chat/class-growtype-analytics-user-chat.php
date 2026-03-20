@@ -106,32 +106,74 @@ class Growtype_Analytics_User_Chat
         }
 
         $html = '<div class="chat-sessions-list">';
-        
+
+        // Batch fetching for optimization
+        $session_ids = wp_list_pluck($sessions, 'id');
+        $all_messages = [];
+        if (!empty($session_ids)) {
+            $ids_in = implode(',', array_map('intval', $session_ids));
+            $all_messages_results = $wpdb->get_results(
+                "SELECT m.*, sm.session_id
+                 FROM {$wpdb->prefix}growtype_chat_messages m
+                 INNER JOIN {$wpdb->prefix}growtype_chat_session_message sm ON m.id = sm.message_id
+                 WHERE sm.session_id IN ($ids_in)
+                 ORDER BY m.created_at ASC"
+            );
+            foreach ($all_messages_results as $msg) {
+                $all_messages[$msg->session_id][] = $msg;
+            }
+
+            // Also warm up the metadata cache for these sessions in one query
+            if (class_exists('Growtype_Chat_Session')) {
+                Growtype_Chat_Session::get_settings_batch($session_ids);
+            }
+        }
+
         foreach ($sessions as $session) {
-            // Get messages for this session using pivot table
-            $messages = $wpdb->get_results($wpdb->prepare(
-                "SELECT m.* 
-                FROM {$wpdb->prefix}growtype_chat_messages m
-                INNER JOIN {$wpdb->prefix}growtype_chat_session_message sm ON m.id = sm.message_id
-                WHERE sm.session_id = %d 
-                ORDER BY m.created_at ASC",
-                $session->id
-            ));
+            // Use batched messages
+            $messages = $all_messages[$session->id] ?? [];
 
             $message_count = count($messages);
-            $user_messages = array_filter($messages, function($msg) {
-                return isset($msg->author_type) && $msg->author_type === 'user';
+            $user_messages = array_filter($messages, function ($msg) use ($chat_user_id) {
+                if (isset($msg->author_type)) {
+                    return $msg->author_type === 'user';
+                }
+                return (int)$msg->user_id === (int)$chat_user_id;
             });
-            $bot_messages = array_filter($messages, function($msg) {
-                return isset($msg->author_type) && $msg->author_type === 'bot';
+            $bot_messages = array_filter($messages, function ($msg) use ($chat_user_id) {
+                if (isset($msg->author_type)) {
+                    return $msg->author_type === 'bot';
+                }
+                return (int)$msg->user_id !== (int)$chat_user_id;
             });
 
             $created_time = strtotime($session->created_at);
             $time_ago = human_time_diff($created_time, current_time('timestamp')) . ' ago';
 
+            // Extract character settings and thumbnail early
+            $settings = [];
+            $character_slug = '';
+            $bot_image_html = '<div class="session-icon">💬</div>';
+
+            if (class_exists('Growtype_Chat_Session')) {
+                $chat_session = Growtype_Chat_Session::get($session->id);
+                $settings = $chat_session['settings'] ?? [];
+                $character_slug = $settings['slug'] ?? '';
+
+                    if (!empty($chat_session['featured_images'])) {
+                        $bot_image_html = '<div class="session-icon g-chatsessions-single-image" style="padding:0; background:transparent; display:flex; gap:4px; max-width:80px; overflow:hidden;">';
+                        foreach ($chat_session['featured_images'] as $featured_image) {
+                            if (isset($featured_image['url'])) {
+                                $bot_image_html .= '<div class="g-chatsessions-single-image-user" style="min-width:36px;width:56px;height:56px;border-radius:50%;background: url(\'' . esc_url($featured_image['url']) . '\');background-size: cover;background-position: center;"></div>';
+                            }
+                        }
+                        $bot_image_html .= '</div>';
+                    }
+                }
+
             $html .= '<div class="chat-session-item">';
             $html .= '<div class="session-header">';
-            $html .= '<div class="session-icon">💬</div>';
+            $html .= $bot_image_html;
             $html .= '<div class="session-info">';
             $html .= '<div class="session-title">';
             $html .= '<strong>Session #' . esc_html($session->id) . '</strong>';
@@ -146,15 +188,14 @@ class Growtype_Analytics_User_Chat
 
             // Display Session Meta/Settings
             if (class_exists('Growtype_Chat_Session')) {
-                $settings = Growtype_Chat_Session::get_settings($session->id);
                 if (!empty($settings)) {
                     $html .= '<div class="session-settings" style="font-size: 0.85em; color: #666; margin-top: 4px; border-top: 1px solid #eee; padding-top: 4px;">';
                     $html .= '<strong>Settings:</strong> ';
                     $settings_list = [];
-                    foreach ($settings as $setting) {
+                    foreach ($settings as $key => $val) {
                         // Skip internal/system meta if needed, but user asked for "show all"
-                         $val = is_string($setting['meta_value']) ? $setting['meta_value'] : json_encode($setting['meta_value']);
-                         $settings_list[] = '<span class="setting-item" title="' . esc_attr($setting['meta_key']) . '">' . esc_html($setting['meta_key']) . ': ' . esc_html($val) . '</span>';
+                        $display_val = is_string($val) ? $val : json_encode($val);
+                        $settings_list[] = '<span class="setting-item" title="' . esc_attr($key) . '">' . esc_html($key) . ': ' . esc_html($display_val) . '</span>';
                     }
                     $html .= implode(' • ', $settings_list);
                     $html .= '</div>';
@@ -165,15 +206,8 @@ class Growtype_Analytics_User_Chat
             $urls = [];
             
             // Character URL
+            // Character URL
             if (!empty($settings)) {
-                $character_slug = '';
-                foreach ($settings as $setting) {
-                    if ($setting['meta_key'] === 'slug') {
-                        $character_slug = $setting['meta_value'];
-                        break;
-                    }
-                }
-                
                 if (!empty($character_slug)) {
                      $character_url = home_url('/chat/' . $character_slug);
                      $urls[] = '<a href="' . esc_url($character_url) . '" target="_blank">' . sprintf(__('Character Link (%s)', 'growtype-analytics'), $character_slug) . '</a>';

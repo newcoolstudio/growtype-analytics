@@ -20,18 +20,19 @@
  * @subpackage growtype_analytics/includes
  * @author     Your Name <email@example.com>
  */
-class Growtype_Analytics_Activator {
+class Growtype_Analytics_Activator
+{
 
-	/**
-	 * Short Description. (use period)
-	 *
-	 * Long Description.
-	 *
-	 * @since    1.0.0
-	 */
-	public static function activate() {
+    /**
+     * Short Description. (use period)
+     *
+     * Long Description.
+     *
+     * @since    1.0.0
+     */
+    public static function activate()
+    {
         global $wp_rewrite;
         $wp_rewrite->flush_rules();
-	}
-
+    }
 }

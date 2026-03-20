@@ -16,20 +16,121 @@ class Growtype_Analytics_Admin_Metrics
         $this->controller = $controller;
 
         // Bust the snapshot cache whenever orders or users change
-        add_action('woocommerce_order_status_changed', array($this, 'bust_snapshot_cache'));
-        add_action('woocommerce_new_order',            array($this, 'bust_snapshot_cache'));
-        add_action('user_register',                    array($this, 'bust_snapshot_cache'));
+        add_action('woocommerce_order_status_changed', array ($this, 'bust_snapshot_cache'));
+        add_action('woocommerce_new_order', array ($this, 'bust_snapshot_cache'));
+        add_action('user_register', array ($this, 'bust_snapshot_cache'));
     }
 
     public function bust_snapshot_cache()
     {
-        delete_transient('growtype_analytics_snapshot_metrics_v1');
+        global $wpdb;
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_growtype_analytics_snapshot_metrics_v3_%' OR option_name LIKE '_transient_timeout_growtype_analytics_snapshot_metrics_v3_%'");
     }
 
-    public function get_scale_or_pivot_metrics($refresh = false)
+    public function build_period_sql($column, $period)
     {
-        $transient_key = 'growtype_analytics_snapshot_metrics_v1';
-        
+        if (empty($period)) {
+            $period = 30;
+        }
+
+        if (is_numeric($period)) {
+            $days = max(1, (int)$period);
+            return array (
+                'sql' => " AND {$column} >= DATE_SUB(NOW(), INTERVAL %d DAY)",
+                'params' => array ($days)
+            );
+        }
+
+        $dates = explode(' - ', $period);
+        if (count($dates) === 2) {
+            $start = trim($dates[0]) . ' 00:00:00';
+            $end = trim($dates[1]) . ' 23:59:59';
+            return array (
+                'sql' => " AND {$column} >= %s AND {$column} <= %s",
+                'params' => array ($start, $end)
+            );
+        }
+
+        return array ('sql' => "", 'params' => array ());
+    }
+
+    public function build_previous_period_sql($column, $period)
+    {
+        if (empty($period)) {
+            $period = 30;
+        }
+
+        if (is_numeric($period)) {
+            $days = max(1, (int)$period);
+            return array (
+                'sql' => " AND {$column} >= DATE_SUB(NOW(), INTERVAL %d DAY) AND {$column} < DATE_SUB(NOW(), INTERVAL %d DAY)",
+                'params' => array ($days * 2, $days)
+            );
+        }
+
+        $dates = explode(' - ', $period);
+        if (count($dates) === 2) {
+            $start_dt = new DateTime(trim($dates[0]));
+            $end_dt = new DateTime(trim($dates[1]));
+            $diff = $start_dt->diff($end_dt)->days + 1;
+
+            $prev_end_dt = clone $start_dt;
+            $prev_end_dt->modify('-1 day');
+
+            $prev_start_dt = clone $prev_end_dt;
+            $prev_start_dt->modify('-' . ($diff - 1) . ' days');
+
+            $start = $prev_start_dt->format('Y-m-d') . ' 00:00:00';
+            $end = $prev_end_dt->format('Y-m-d') . ' 23:59:59';
+
+            return array (
+                'sql' => " AND {$column} >= %s AND {$column} <= %s",
+                'params' => array ($start, $end)
+            );
+        }
+
+        return array ('sql' => "", 'params' => array ());
+    }
+
+    public function get_period_days_count($period)
+    {
+        if (empty($period)) {
+            return 30;
+        }
+
+        if (is_numeric($period)) {
+            return max(1, (int)$period);
+        }
+        $dates = explode(' - ', $period);
+        if (count($dates) === 2) {
+            $start_dt = new DateTime(trim($dates[0]));
+            $end_dt = new DateTime(trim($dates[1]));
+            return max(1, $start_dt->diff($end_dt)->days + 1);
+        }
+        return 30;
+    }
+
+    public function get_period_label($period)
+    {
+        if (is_string($period) && strpos($period, ' - ') !== false) {
+            return $period;
+        }
+        $days = is_numeric($period) ? (int)$period : 30;
+        $from = date('Y-m-d', strtotime("-" . ($days - 1) . " days"));
+        $to = date('Y-m-d');
+        return "{$from} - {$to}";
+    }
+
+    public function get_scale_or_pivot_metrics($refresh = false, $period = 30)
+    {
+        if (isset($_GET['period']) && !empty($_GET['period'])) {
+            $period = sanitize_text_field($_GET['period']);
+        } elseif (!empty($_GET['date_from']) && !empty($_GET['date_to'])) {
+            $period = sanitize_text_field($_GET['date_from']) . ' - ' . sanitize_text_field($_GET['date_to']);
+        }
+
+        $transient_key = 'growtype_analytics_snapshot_metrics_v3_' . md5($period);
+
         if ($refresh) {
             delete_transient($transient_key);
         }
@@ -42,30 +143,32 @@ class Growtype_Analytics_Admin_Metrics
         global $wpdb;
         $settings = $this->get_snapshot_settings();
 
-        $metrics = array(
+        $metrics = array (
             'registered_users_total' => 0,
             'new_users_7d' => 0,
-            'new_users_30d' => 0,
+            'new_users' => 0,
             'activation_rate_7d' => 0,
-            'activation_rate_30d' => 0,
+            'activation_rate' => 0,
             'buyers_total' => 0,
             'buyer_conversion_total' => 0,
-            'new_user_to_buyer_conversion_30d' => 0,
-            'paid_orders_30d' => 0,
-            'revenue_30d' => 0,
-            'aov_30d' => 0,
-            'payment_success_rate_30d' => 0,
-            'unpaid_attempts_30d' => 0,
+            'new_user_to_buyer_conversion' => 0,
+            'paid_orders' => 0,
+            'revenue' => 0,
+            'aov' => 0,
+            'payment_success_rate' => 0,
+            'unpaid_attempts' => 0,
             'repurchase_rate_total' => 0,
             'arppu_total' => 0,
             'new_user_to_buyer_conversion_daily' => 0,
+            'attempt_users' => 0,
+            'user_try_to_buy_rate' => 0,
             'dau' => 0,
             'wau' => 0,
             'mau' => 0,
             'stickiness_ratio' => 0,
             'churn_risk_recent_payers' => 0,
             // P0 growth & scale metrics
-            'revenue_prev_30d' => 0,
+            'revenue_prev' => 0,
             'revenue_growth_mom' => 0,
             'new_users_prev_7d' => 0,
             'new_users_growth_wow' => 0,
@@ -77,7 +180,8 @@ class Growtype_Analytics_Admin_Metrics
             'median_days_to_first_purchase' => 0,
             // P2 metrics
             'cac_estimate' => 0,
-            'revenue_daily_30d' => array(),
+            'ltv_cac_ratio' => 0,
+            'revenue_daily' => array (),
             'settings' => $settings,
             'activation_min_messages' => (int)$settings['activation_min_messages'],
             'activation_window_days' => (int)$settings['activation_window_days'],
@@ -92,12 +196,12 @@ class Growtype_Analytics_Admin_Metrics
         );
 
         $metrics['new_users_7d'] = $this->controller->funnel->get_new_users_count(7, $settings);
-        $metrics['new_users_30d'] = $this->controller->funnel->get_new_users_count(30, $settings);
+        $metrics['new_users'] = $this->controller->funnel->get_new_users_count($period, $settings);
 
         $activation_7d = $this->controller->funnel->get_activation_metrics(7, $settings);
-        $activation_30d = $this->controller->funnel->get_activation_metrics(30, $settings);
+        $activation_30d = $this->controller->funnel->get_activation_metrics($period, $settings);
         $metrics['activation_rate_7d'] = $activation_7d['rate'];
-        $metrics['activation_rate_30d'] = $activation_30d['rate'];
+        $metrics['activation_rate'] = $activation_30d['rate'];
 
         $paid_status_placeholders = implode(',', array_fill(0, count($settings['paid_statuses']), '%s'));
         $buyer_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
@@ -112,24 +216,29 @@ class Growtype_Analytics_Admin_Metrics
             {$buyer_exclusion['sql']}";
         $metrics['buyers_total'] = (int)$wpdb->get_var(
             $this->prepare_dynamic_query(
-            $buyers_query,
-            array_merge($settings['paid_statuses'], $buyer_exclusion['params'])
-        )
+                $buyers_query,
+                array_merge($settings['paid_statuses'], $buyer_exclusion['params'])
+            )
         );
 
         $metrics['buyer_conversion_total'] = $metrics['registered_users_total'] > 0
             ? round(($metrics['buyers_total'] / $metrics['registered_users_total']) * 100, 2)
             : 0;
 
-        $metrics['new_user_to_buyer_conversion_30d'] = $this->get_new_user_to_buyer_conversion(30, $settings);
+        $metrics['new_user_to_buyer_conversion'] = $this->get_new_user_to_buyer_conversion($period, $settings);
         $metrics['new_user_to_buyer_conversion_daily'] = $this->get_new_user_to_buyer_conversion(1, $settings);
 
-        $orders_30d = $this->get_order_metrics(30, $settings);
-        $metrics['paid_orders_30d'] = $orders_30d['paid_orders'];
-        $metrics['revenue_30d'] = $orders_30d['revenue'];
-        $metrics['aov_30d'] = $orders_30d['aov'];
-        $metrics['payment_success_rate_30d'] = $orders_30d['success_rate'];
-        $metrics['unpaid_attempts_30d'] = $orders_30d['unpaid_attempts'];
+        $orders_30d = $this->get_order_metrics($period, $settings);
+        $metrics['paid_orders'] = $orders_30d['paid_orders'];
+        $metrics['revenue'] = $orders_30d['revenue'];
+        $metrics['aov'] = $orders_30d['aov'];
+        $metrics['payment_success_rate'] = $orders_30d['success_rate'];
+        $metrics['unpaid_attempts'] = $orders_30d['unpaid_attempts'];
+
+        $metrics['attempt_users'] = $this->get_new_attempt_users_count($period, $settings);
+        $metrics['user_try_to_buy_rate'] = $metrics['new_users'] > 0
+            ? round(($metrics['attempt_users'] / $metrics['new_users']) * 100, 2)
+            : 0;
 
         $repurchase = $this->get_repurchase_metrics($settings);
         $metrics['repurchase_rate_total'] = $repurchase['rate'];
@@ -145,12 +254,12 @@ class Growtype_Analytics_Admin_Metrics
 
         // --- P0 growth metrics ---
 
-        // MoM Revenue Growth: compare current 30d vs previous 30d (days 31-60)
-        $orders_prev_30d = $this->get_order_metrics_range(60, 30, $settings);
-        $metrics['revenue_prev_30d'] = $orders_prev_30d['revenue'];
-        $metrics['revenue_growth_mom'] = $metrics['revenue_prev_30d'] > 0
-            ? round((($metrics['revenue_30d'] - $metrics['revenue_prev_30d']) / $metrics['revenue_prev_30d']) * 100, 2)
-            : ($metrics['revenue_30d'] > 0 ? 100 : 0);
+        // Compare current period vs previous period
+        $orders_prev_30d = $this->get_order_metrics_previous_period($period, $settings);
+        $metrics['revenue_prev'] = $orders_prev_30d['revenue'];
+        $metrics['revenue_growth_mom'] = $metrics['revenue_prev'] > 0
+            ? round((($metrics['revenue'] - $metrics['revenue_prev']) / $metrics['revenue_prev']) * 100, 2)
+            : ($metrics['revenue'] > 0 ? 100 : 0);
 
         // WoW New User Growth: compare current 7d vs previous 7d
         $metrics['new_users_prev_7d'] = $this->controller->funnel->get_new_users_count_range(14, 7, $settings);
@@ -182,15 +291,24 @@ class Growtype_Analytics_Admin_Metrics
 
         // --- P2 metrics ---
 
-        // CAC Estimate = marketing spend 30d / new buyers 30d
-        $marketing_spend = (float)$settings['marketing_spend_30d'];
-        $new_buyers_30d = $this->get_new_buyers_count(30, $settings);
+        // CAC Estimate = marketing spend / new buyers
+        $marketing_spend = (float)$settings['marketing_spend_30d']; // we might want to scale it based on period but we leave it as is for now
+        $new_buyers_30d = $this->get_new_buyers_count($period, $settings);
         $metrics['cac_estimate'] = ($marketing_spend > 0 && $new_buyers_30d > 0)
             ? round($marketing_spend / $new_buyers_30d, 2)
             : 0;
 
-        // Daily Revenue Trend for the last 30d
-        $metrics['revenue_daily_30d'] = $this->get_revenue_trend_daily(30, $settings);
+        // LTV / CAC Ratio: The "Scale Engine" health metric
+        $metrics['ltv_cac_ratio'] = ($metrics['cac_estimate'] > 0)
+            ? round($metrics['ltv_estimate'] / $metrics['cac_estimate'], 2)
+            : 0;
+
+        // Daily Revenue Trend for the selected period
+        $metrics['revenue_daily'] = $this->get_revenue_trend_daily($period, $settings);
+
+        // Store period info so the UI can use it
+        $metrics['active_period_days'] = $this->get_period_days_count($period);
+        $metrics['active_period_string'] = $this->get_period_label($period);
 
         set_transient($transient_key, $metrics, GROWTYPE_ANALYTICS_CACHE_TIME);
 
@@ -202,18 +320,19 @@ class Growtype_Analytics_Admin_Metrics
         global $wpdb;
         $paid_status_placeholders = implode(',', array_fill(0, count($settings['paid_statuses']), '%s'));
         $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
+        $period_sql = $this->build_period_sql('u.user_registered', $days);
         $query = "SELECT COUNT(DISTINCT u.ID)
             FROM `{$wpdb->users}` u
             INNER JOIN `{$wpdb->postmeta}` pm ON pm.meta_key = '_customer_user' AND pm.meta_value = u.ID
             INNER JOIN `{$wpdb->posts}` p ON p.ID = pm.post_id
-            WHERE u.user_registered >= DATE_SUB(NOW(), INTERVAL %d DAY)
+            WHERE 1=1 {$period_sql['sql']}
             AND p.post_type = 'shop_order'
             AND p.post_status IN ($paid_status_placeholders)
             {$email_exclusion['sql']}";
         return (int)$wpdb->get_var(
             $this->prepare_dynamic_query(
                 $query,
-                array_merge(array((int)$days), $settings['paid_statuses'], $email_exclusion['params'])
+                array_merge($period_sql['params'], $settings['paid_statuses'], $email_exclusion['params'])
             )
         );
     }
@@ -228,11 +347,12 @@ class Growtype_Analytics_Admin_Metrics
         return round(($buyers / $new_users) * 100, 2);
     }
 
-    public function get_order_metrics($days, $settings)
+    public function get_order_metrics($period, $settings)
     {
         global $wpdb;
         $attempt_placeholders = implode(',', array_fill(0, count($settings['attempt_statuses']), '%s'));
         $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns'], true);
+        $period_sql = $this->build_period_sql('p.post_date', $period);
         $query = "SELECT p.post_status, COUNT(DISTINCT p.ID) as order_count, SUM(CAST(total.meta_value AS DECIMAL(10,2))) as total_revenue
             FROM $wpdb->posts p
             INNER JOIN $wpdb->postmeta total ON total.post_id = p.ID AND total.meta_key = '_order_total'
@@ -240,14 +360,14 @@ class Growtype_Analytics_Admin_Metrics
             LEFT JOIN $wpdb->users u ON customer.meta_value = u.ID
             WHERE p.post_type = 'shop_order'
             AND p.post_status IN ($attempt_placeholders)
-            AND p.post_date >= DATE_SUB(NOW(), INTERVAL %d DAY)
+            {$period_sql['sql']}
             {$email_exclusion['sql']}
             GROUP BY p.post_status";
         $results = $wpdb->get_results(
             $this->prepare_dynamic_query(
-            $query,
-            array_merge($settings['attempt_statuses'], array((int)$days), $email_exclusion['params'])
-        ),
+                $query,
+                array_merge($settings['attempt_statuses'], $period_sql['params'], $email_exclusion['params'])
+            ),
             ARRAY_A
         );
 
@@ -266,13 +386,12 @@ class Growtype_Analytics_Admin_Metrics
             if (in_array($status, $settings['paid_statuses'], true)) {
                 $paid_orders += $count;
                 $paid_revenue += $revenue;
-            }
-            else {
+            } else {
                 $unpaid_attempts += $count;
             }
         }
 
-        return array(
+        return array (
             'paid_orders' => $paid_orders,
             'revenue' => round($paid_revenue, 2),
             'aov' => $paid_orders > 0 ? round($paid_revenue / $paid_orders, 2) : 0,
@@ -285,11 +404,12 @@ class Growtype_Analytics_Admin_Metrics
      * Get order metrics for a specific date range (from $from_days ago to $to_days ago).
      * Used for period-over-period comparisons (e.g. previous 30d revenue).
      */
-    public function get_order_metrics_range($from_days, $to_days, $settings)
+    public function get_order_metrics_previous_period($period, $settings)
     {
         global $wpdb;
         $attempt_placeholders = implode(',', array_fill(0, count($settings['attempt_statuses']), '%s'));
         $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns'], true);
+        $period_sql = $this->build_previous_period_sql('p.post_date', $period);
         $query = "SELECT p.post_status, COUNT(DISTINCT p.ID) as order_count, SUM(CAST(total.meta_value AS DECIMAL(10,2))) as total_revenue
             FROM `{$wpdb->posts}` p
             INNER JOIN `{$wpdb->postmeta}` total ON total.post_id = p.ID AND total.meta_key = '_order_total'
@@ -297,14 +417,13 @@ class Growtype_Analytics_Admin_Metrics
             LEFT JOIN `{$wpdb->users}` u ON customer.meta_value = u.ID
             WHERE p.post_type = 'shop_order'
             AND p.post_status IN ($attempt_placeholders)
-            AND p.post_date >= DATE_SUB(NOW(), INTERVAL %d DAY)
-            AND p.post_date < DATE_SUB(NOW(), INTERVAL %d DAY)
+            {$period_sql['sql']}
             {$email_exclusion['sql']}
             GROUP BY p.post_status";
         $results = $wpdb->get_results(
             $this->prepare_dynamic_query(
                 $query,
-                array_merge($settings['attempt_statuses'], array((int)$from_days, (int)$to_days), $email_exclusion['params'])
+                array_merge($settings['attempt_statuses'], $period_sql['params'], $email_exclusion['params'])
             ),
             ARRAY_A
         );
@@ -312,16 +431,41 @@ class Growtype_Analytics_Admin_Metrics
         $paid_orders = 0;
         $paid_revenue = 0.0;
 
-        foreach ($results ?: array() as $row) {
+        foreach ($results ?: array () as $row) {
             if (in_array($row['post_status'], $settings['paid_statuses'], true)) {
                 $paid_orders += (int)$row['order_count'];
                 $paid_revenue += (float)($row['total_revenue'] ?: 0);
             }
         }
 
-        return array(
+        return array (
             'paid_orders' => $paid_orders,
             'revenue' => round($paid_revenue, 2),
+        );
+    }
+
+    /**
+     * Get unique users registered in the last N days who attempted a purchase.
+     */
+    public function get_new_attempt_users_count($days, $settings)
+    {
+        global $wpdb;
+        $attempt_placeholders = implode(',', array_fill(0, count($settings['attempt_statuses']), '%s'));
+        $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
+        $period_sql = $this->build_period_sql('u.user_registered', $days);
+        $query = "SELECT COUNT(DISTINCT u.ID)
+            FROM `{$wpdb->users}` u
+            INNER JOIN `{$wpdb->postmeta}` pm ON pm.meta_key = '_customer_user' AND pm.meta_value = u.ID
+            INNER JOIN `{$wpdb->posts}` p ON p.ID = pm.post_id
+            WHERE 1=1 {$period_sql['sql']}
+            AND p.post_type = 'shop_order'
+            AND p.post_status IN ($attempt_placeholders)
+            {$email_exclusion['sql']}";
+        return (int)$wpdb->get_var(
+            $this->prepare_dynamic_query(
+                $query,
+                array_merge($period_sql['params'], $settings['attempt_statuses'], $email_exclusion['params'])
+            )
         );
     }
 
@@ -347,14 +491,14 @@ class Growtype_Analytics_Admin_Metrics
         $results = $wpdb->get_results(
             $this->prepare_dynamic_query(
                 $query,
-                array_merge($settings['paid_statuses'], array((int)$days), $email_exclusion['params'])
+                array_merge($settings['paid_statuses'], array ((int)$days), $email_exclusion['params'])
             ),
             ARRAY_A
         );
 
-        $daily_data = array();
-        foreach ($results ?: array() as $row) {
-            $daily_data[] = array(
+        $daily_data = array ();
+        foreach ($results ?: array () as $row) {
+            $daily_data[] = array (
                 'date' => $row['order_date'],
                 'amount' => round((float)$row['total_revenue'], 2)
             );
@@ -399,8 +543,8 @@ class Growtype_Analytics_Admin_Metrics
         $recurring_buyers = (int)($row['recurring_buyers'] ?? 0);
         $total_revenue = (float)($row['total_revenue'] ?? 0);
 
-        return array(
-            'rate'  => $buyers > 0 ? round(($recurring_buyers / $buyers) * 100, 2) : 0,
+        return array (
+            'rate' => $buyers > 0 ? round(($recurring_buyers / $buyers) * 100, 2) : 0,
             'arppu' => $buyers > 0 ? round($total_revenue / $buyers, 2) : 0,
         );
     }
@@ -413,11 +557,11 @@ class Growtype_Analytics_Admin_Metrics
         $chat_messages_table = $wpdb->prefix . 'growtype_chat_messages';
 
         if (!$this->controller->table_exists($chat_users_table) || !$this->controller->table_exists($chat_messages_table)) {
-            return array('dau' => 0, 'wau' => 0, 'mau' => 0, 'stickiness_ratio' => 0);
+            return array ('dau' => 0, 'wau' => 0, 'mau' => 0, 'stickiness_ratio' => 0);
         }
 
         $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
-        
+
         // Single optimized query for DAU, WAU, and MAU
         $query = "SELECT 
                 COUNT(DISTINCT CASE WHEN m.created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY) THEN cu.external_id END) as dau,
@@ -440,7 +584,7 @@ class Growtype_Analytics_Admin_Metrics
         $wau = (int)($results['wau'] ?? 0);
         $mau = (int)($results['mau'] ?? 0);
 
-        return array(
+        return array (
             'dau' => $dau,
             'wau' => $wau,
             'mau' => $mau,
@@ -485,7 +629,7 @@ class Growtype_Analytics_Admin_Metrics
                 $query,
                 array_merge(
                     $settings['paid_statuses'],
-                    array($recent_payer_window_days, $churn_inactivity_days),
+                    array ($recent_payer_window_days, $churn_inactivity_days),
                     $email_exclusion['params']
                 )
             )
@@ -518,7 +662,7 @@ class Growtype_Analytics_Admin_Metrics
         $recent_payers = (int)$wpdb->get_var(
             $this->prepare_dynamic_query(
                 $recent_query,
-                array_merge($settings['paid_statuses'], array($recent_payer_window_days), $email_exclusion['params'])
+                array_merge($settings['paid_statuses'], array ($recent_payer_window_days), $email_exclusion['params'])
             )
         );
 
@@ -556,7 +700,7 @@ class Growtype_Analytics_Admin_Metrics
                 $inactive_query,
                 array_merge(
                     $settings['paid_statuses'],
-                    array($recent_payer_window_days, $churn_inactivity_days),
+                    array ($recent_payer_window_days, $churn_inactivity_days),
                     $email_exclusion['params']
                 )
             )
@@ -610,7 +754,7 @@ class Growtype_Analytics_Admin_Metrics
         $active_recent = (int)$wpdb->get_var(
             $this->prepare_dynamic_query(
                 $active_recent_query,
-                array_merge(array($churn_inactivity_days), $email_exclusion['params'])
+                array_merge(array ($churn_inactivity_days), $email_exclusion['params'])
             )
         );
 
@@ -667,14 +811,14 @@ class Growtype_Analytics_Admin_Metrics
         $marketing_spend_by_source = $this->parse_key_value_map(get_option('growtype_analytics_snapshot_marketing_spend_by_source', ''));
 
         if (empty($paid_statuses)) {
-            $paid_statuses = array('wc-completed', 'wc-processing');
+            $paid_statuses = array ('wc-completed', 'wc-processing');
         }
 
         if (empty($attempt_statuses)) {
-            $attempt_statuses = array('wc-completed', 'wc-processing', 'wc-pending', 'wc-failed', 'wc-cancelled');
+            $attempt_statuses = array ('wc-completed', 'wc-processing', 'wc-pending', 'wc-failed', 'wc-cancelled');
         }
 
-        return array(
+        return array (
             'excluded_email_patterns' => $excluded_patterns,
             'paid_statuses' => $paid_statuses,
             'attempt_statuses' => $attempt_statuses,
@@ -684,6 +828,7 @@ class Growtype_Analytics_Admin_Metrics
             'recent_payer_window_days' => max(1, (int)get_option('growtype_analytics_snapshot_recent_payer_window_days', 90)),
             'marketing_spend_30d' => $marketing_spend_30d,
             'marketing_spend_by_source' => $marketing_spend_by_source,
+            'pinned_kpis' => get_option('growtype_analytics_pinned_kpis', array ('registered_users_total', 'payment_success_rate', 'new_user_to_buyer_conversion', 'user_try_to_buy_rate', 'repurchase_rate_total')),
         );
     }
 
@@ -709,14 +854,14 @@ class Growtype_Analytics_Admin_Metrics
             {$email_exclusion['sql']}";
 
         return (int)$wpdb->get_var(
-            $this->prepare_dynamic_query($query, array_merge(array((int)$days), $email_exclusion['params']))
+            $this->prepare_dynamic_query($query, array_merge(array ((int)$days), $email_exclusion['params']))
         );
     }
 
     private function parse_csv_or_lines($value)
     {
         if (!is_string($value) || $value === '') {
-            return array();
+            return array ();
         }
 
         $parts = preg_split('/[\r\n,;]+/', $value);
@@ -731,12 +876,12 @@ class Growtype_Analytics_Admin_Metrics
     private function parse_key_value_map($value)
     {
         if (!is_string($value) || trim($value) === '') {
-            return array();
+            return array ();
         }
 
         $decoded = json_decode($value, true);
         if (is_array($decoded)) {
-            $result = array();
+            $result = array ();
             foreach ($decoded as $key => $amount) {
                 $normalized_key = $this->normalize_dimension_key($key);
                 if ($normalized_key === '') {
@@ -749,7 +894,7 @@ class Growtype_Analytics_Admin_Metrics
             return $result;
         }
 
-        $result = array();
+        $result = array ();
         $lines = preg_split('/[\r\n]+/', $value);
 
         foreach ($lines as $line) {
@@ -785,7 +930,7 @@ class Growtype_Analytics_Admin_Metrics
 
     private function sanitize_wc_statuses($statuses)
     {
-        $sanitized = array();
+        $sanitized = array ();
 
         foreach ($statuses as $status) {
             $normalized = sanitize_key($status);
@@ -803,11 +948,11 @@ class Growtype_Analytics_Admin_Metrics
         global $wpdb;
 
         if (empty($patterns)) {
-            return array('sql' => '', 'params' => array());
+            return array ('sql' => '', 'params' => array ());
         }
 
-        $sql_parts = array();
-        $params = array();
+        $sql_parts = array ();
+        $params = array ();
 
         foreach ($patterns as $pattern) {
             $sql_parts[] = "$column NOT LIKE %s";
@@ -820,13 +965,13 @@ class Growtype_Analytics_Admin_Metrics
         }
         $sql .= ')';
 
-        return array(
+        return array (
             'sql' => $sql,
             'params' => $params
         );
     }
 
-    public function prepare_dynamic_query($query, $params = array())
+    public function prepare_dynamic_query($query, $params = array ())
     {
         global $wpdb;
 
@@ -846,11 +991,13 @@ class Growtype_Analytics_Admin_Metrics
         }));
 
         if (empty($failure_statuses)) {
-            return array();
+            return array ();
         }
 
         $status_placeholders = implode(',', array_fill(0, count($failure_statuses), '%s'));
         $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns'], true);
+
+        $period_sql = $this->build_period_sql('p.post_date', $days);
 
         // Standard WooCommerce meta keys
         // _payment_method_title (Gateway)
@@ -868,17 +1015,17 @@ class Growtype_Analytics_Admin_Metrics
             LEFT JOIN $wpdb->users u ON customer.meta_value = u.ID
             WHERE p.post_type = 'shop_order'
             AND p.post_status IN ($status_placeholders)
-            AND p.post_date >= DATE_SUB(NOW(), INTERVAL %d DAY)
+            {$period_sql['sql']}
             {$email_exclusion['sql']}
             GROUP BY gateway, country
             ORDER BY count DESC
             LIMIT %d";
 
-        $params = array_merge($failure_statuses, array((int)$days), $email_exclusion['params'], array((int)$limit));
+        $params = array_merge($failure_statuses, $period_sql['params'], $email_exclusion['params'], array ((int)$limit));
         $results = $wpdb->get_results($this->prepare_dynamic_query($query, $params), ARRAY_A);
 
         return array_map(function ($row) {
-            return array(
+            return array (
                 'gateway' => $row['gateway'] ?: __('Unknown', 'growtype-analytics'),
                 'device' => __('Unknown', 'growtype-analytics'), // Device info is not standard in WC order meta
                 'country' => $row['country'] ?: __('Unknown', 'growtype-analytics'),
@@ -886,46 +1033,42 @@ class Growtype_Analytics_Admin_Metrics
                 'attempts' => (int)$row['count'],
                 'lost_revenue' => (float)$row['lost_revenue']
             );
-        }, $results ?: array());
+        }, $results ?: array ());
     }
 
     public function get_traffic_funnel_data($days = 30)
     {
         $settings = $this->get_snapshot_settings();
         $funnel = $this->controller->funnel->get_funnel_dropoff_metrics($days, $settings);
-        $pageviews = $this->get_posthog_pageview_data($days);
+        $pageviews = $this->controller->posthog->get_pageview_data($days);
         $traffic_count = array_sum($pageviews['values']);
         $registered = $this->controller->funnel->get_new_users_count($days, $settings);
         $activated = (int)($funnel['activated'] ?? 0);
         $attempts = $this->controller->funnel->get_new_user_attempt_count($days, $settings);
         $paid = $this->controller->funnel->get_new_user_paid_count($days, $settings);
 
-        $stages = array();
+        $stages = array ();
 
         if ($traffic_count > 0) {
-            $stages[] = array(
+            $stages[] = array (
                 'label' => __('Pageviews', 'growtype-analytics'),
                 'count' => $traffic_count,
             );
         }
 
-        $stages = array_merge($stages, array(
-            array('label' => __('Registrations', 'growtype-analytics'), 'count' => $registered),
-            array('label' => __('Activated', 'growtype-analytics'), 'count' => $activated),
-            array('label' => __('Checkout Attempt', 'growtype-analytics'), 'count' => $attempts),
-            array('label' => __('Paid', 'growtype-analytics'), 'count' => $paid),
-        ));
+        $funnel_stages = $this->controller->funnel->get_funnel_stages($registered, $activated, $attempts, $paid);
+        $stages = array_merge($stages, $funnel_stages);
 
         $first = max(1, (int)$stages[0]['count']);
         $previous = null;
-        $rows = array();
+        $rows = array ();
 
         foreach ($stages as $stage) {
             $count = (int)$stage['count'];
             $vs_previous = $previous === null ? 100 : ($previous > 0 ? ($count / $previous) * 100 : 0);
             $vs_first = ($count / $first) * 100;
 
-            $rows[] = array(
+            $rows[] = array (
                 'label' => $stage['label'],
                 'count' => $this->controller->format_number($count),
                 'vs_previous' => $this->controller->format_percent($vs_previous),
@@ -935,7 +1078,7 @@ class Growtype_Analytics_Admin_Metrics
             $previous = $count;
         }
 
-        return array(
+        return array (
             'period_days' => (int)$days,
             'traffic_source' => $traffic_count > 0 ? 'posthog_pageviews' : 'registrations_only',
             'traffic_available' => $traffic_count > 0,
@@ -954,17 +1097,17 @@ class Growtype_Analytics_Admin_Metrics
         $profiles = $this->get_paid_buyer_profiles($settings);
         $cutoff = strtotime('-' . (int)$days . ' days');
         $source_costs = $settings['marketing_spend_by_source'];
-        $sources = array();
+        $sources = array ();
 
         foreach ($profiles as $profile) {
             $source = $profile['acquisition_source'];
 
             if (!isset($sources[$source])) {
-                $sources[$source] = array(
+                $sources[$source] = array (
                     'source' => $profile['acquisition_source_label'],
                     'new_buyers' => 0,
                     'buyers_active_30d' => 0,
-                    'revenue_30d' => 0.0,
+                    'revenue' => 0.0,
                 );
             }
 
@@ -976,13 +1119,13 @@ class Growtype_Analytics_Admin_Metrics
                 $sources[$source]['buyers_active_30d']++;
             }
 
-            $sources[$source]['revenue_30d'] += $profile['revenue_30d'];
+            $sources[$source]['revenue'] += $profile['revenue'];
         }
 
         foreach ($sources as $source_key => &$source) {
             $cost = (float)($source_costs[$source_key] ?? 0);
             $new_buyers = max(0, (int)$source['new_buyers']);
-            $revenue = (float)$source['revenue_30d'];
+            $revenue = (float)$source['revenue'];
 
             $source['cost_30d'] = $cost;
             $source['cac'] = $cost > 0 && $new_buyers > 0 ? $cost / $new_buyers : 0;
@@ -991,21 +1134,21 @@ class Growtype_Analytics_Admin_Metrics
         unset($source);
 
         uasort($sources, function ($left, $right) {
-            if ($left['revenue_30d'] === $right['revenue_30d']) {
+            if ($left['revenue'] === $right['revenue']) {
                 return $right['new_buyers'] <=> $left['new_buyers'];
             }
 
-            return $right['revenue_30d'] <=> $left['revenue_30d'];
+            return $right['revenue'] <=> $left['revenue'];
         });
 
         $sources = array_slice($sources, 0, $limit, true);
 
         return array_map(function ($source) {
-            return array(
+            return array (
                 'source' => $source['source'],
                 'new_buyers_30d' => $this->controller->format_number($source['new_buyers']),
                 'active_buyers_30d' => $this->controller->format_number($source['buyers_active_30d']),
-                'revenue_30d' => $this->controller->format_money($source['revenue_30d']),
+                'revenue' => $this->controller->format_money($source['revenue']),
                 'cost_30d' => $this->controller->format_money($source['cost_30d']),
                 'cac' => $this->controller->format_money($source['cac']),
                 'roas' => $source['cost_30d'] > 0 ? round($source['roas'], 2) . 'x' : __('N/A', 'growtype-analytics'),
@@ -1018,13 +1161,13 @@ class Growtype_Analytics_Admin_Metrics
         $settings = $this->get_snapshot_settings();
         $profiles = $this->get_paid_buyer_profiles($settings);
         $cutoff_30d = strtotime('-30 days');
-        $sources = array();
+        $sources = array ();
 
         foreach ($profiles as $profile) {
             $source = $profile['acquisition_source'];
 
             if (!isset($sources[$source])) {
-                $sources[$source] = array(
+                $sources[$source] = array (
                     'source' => $profile['acquisition_source_label'],
                     'buyers' => 0,
                     'repeat_30d' => 0,
@@ -1054,7 +1197,7 @@ class Growtype_Analytics_Admin_Metrics
         return array_map(function ($source) {
             $buyers = max(1, (int)$source['buyers']);
 
-            return array(
+            return array (
                 'source' => $source['source'],
                 'buyers' => $this->controller->format_number($source['buyers']),
                 'repeat_count_30d' => $this->controller->format_number($source['repeat_30d']),
@@ -1097,23 +1240,23 @@ class Growtype_Analytics_Admin_Metrics
             ARRAY_A
         );
 
-        $buyers = array();
+        $buyers = array ();
 
-        foreach ($rows ?: array() as $row) {
+        foreach ($rows ?: array () as $row) {
             $user_id = (int)$row['user_id'];
             $order_id = (int)$row['order_id'];
             $paid_at = strtotime($row['paid_at']);
             $revenue = (float)$row['line_total'];
 
             if (!isset($buyers[$user_id])) {
-                $buyers[$user_id] = array(
+                $buyers[$user_id] = array (
                     'offer' => $row['offer_name'] ?: 'unknown',
                     'first_order_id' => $order_id,
                     'first_paid_at' => $paid_at,
                     'repeat_30d' => false,
                     'repeat_ever' => false,
                     'revenue' => 0.0,
-                    'seen_orders' => array(),
+                    'seen_orders' => array (),
                 );
             }
 
@@ -1132,13 +1275,13 @@ class Growtype_Analytics_Admin_Metrics
             $buyers[$user_id]['revenue'] += $revenue;
         }
 
-        $offers = array();
+        $offers = array ();
 
         foreach ($buyers as $buyer) {
             $offer = $buyer['offer'];
 
             if (!isset($offers[$offer])) {
-                $offers[$offer] = array(
+                $offers[$offer] = array (
                     'buyers' => 0,
                     'repeat_30d' => 0,
                     'repeat_ever' => 0,
@@ -1164,10 +1307,10 @@ class Growtype_Analytics_Admin_Metrics
 
         $offers = array_slice($offers, 0, $limit, true);
 
-        $formatted = array();
+        $formatted = array ();
         foreach ($offers as $offer_name => $offer) {
             $buyers_count = max(1, (int)$offer['buyers']);
-            $formatted[] = array(
+            $formatted[] = array (
                 'offer_name' => $offer_name,
                 'buyers' => $this->controller->format_number($offer['buyers']),
                 'repeat_30d' => $this->controller->format_number($offer['repeat_30d']),
@@ -1184,7 +1327,7 @@ class Growtype_Analytics_Admin_Metrics
     private function get_paid_buyer_profiles($settings)
     {
         $orders = $this->get_paid_orders_with_source($settings);
-        $buyers = array();
+        $buyers = array ();
 
         foreach ($orders as $order) {
             $user_id = (int)$order['user_id'];
@@ -1194,14 +1337,14 @@ class Growtype_Analytics_Admin_Metrics
             $source_key = $this->normalize_dimension_key($source_label);
 
             if (!isset($buyers[$user_id])) {
-                $buyers[$user_id] = array(
+                $buyers[$user_id] = array (
                     'acquisition_source' => $source_key,
                     'acquisition_source_label' => $source_label,
                     'first_paid_at' => $paid_at,
                     'last_paid_at' => $paid_at,
                     'repeat_30d' => false,
                     'revenue_total' => 0.0,
-                    'revenue_30d' => 0.0,
+                    'revenue' => 0.0,
                 );
             } else {
                 $buyers[$user_id]['last_paid_at'] = max($buyers[$user_id]['last_paid_at'], $paid_at);
@@ -1213,7 +1356,7 @@ class Growtype_Analytics_Admin_Metrics
 
             $buyers[$user_id]['revenue_total'] += $revenue;
             if ($paid_at >= strtotime('-30 days')) {
-                $buyers[$user_id]['revenue_30d'] += $revenue;
+                $buyers[$user_id]['revenue'] += $revenue;
             }
         }
 
@@ -1248,66 +1391,9 @@ class Growtype_Analytics_Admin_Metrics
         return $wpdb->get_results(
             $this->prepare_dynamic_query($query, array_merge($paid, $email_exclusion['params'])),
             ARRAY_A
-        ) ?: array();
+        ) ?: array ();
     }
 
-    private function get_posthog_pageview_data($days)
-    {
-        $api_key = get_option('growtype_analytics_posthog_details_api_key');
-        $project_id = get_option('growtype_analytics_posthog_details_project_id');
-        $host = get_option('growtype_analytics_posthog_details_host', 'https://eu.i.posthog.com');
-
-        if (empty($api_key) || empty($project_id)) {
-            return array('labels' => array(), 'values' => array());
-        }
-
-        $transient_key = 'growtype_analytics_posthog_pageviews_' . $days;
-        $cached = get_transient($transient_key);
-        if ($cached !== false) {
-            return $cached;
-        }
-
-        $host = rtrim($host, '/');
-        $date_from = '-' . ($days - 1) . 'd';
-
-        $url = add_query_arg(array(
-            'insight'   => 'TRENDS',
-            'interval'  => 'day',
-            'date_from' => $date_from,
-            'events'    => wp_json_encode(array(
-                array(
-                    'id'   => '$pageview',
-                    'math' => 'total',
-                )
-            ))
-        ), $host . '/api/projects/' . $project_id . '/insights/trend/');
-
-        $response = wp_remote_get($url, array(
-            'headers' => array(
-                'Authorization' => 'Bearer ' . $api_key,
-                'Content-Type'  => 'application/json',
-            ),
-            'timeout' => 15,
-        ));
-
-        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-            return array('labels' => array(), 'values' => array());
-        }
-
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        if (empty($body['result']) || !isset($body['result'][0]['data'])) {
-            return array('labels' => array(), 'values' => array());
-        }
-
-        $result = array(
-            'labels' => $body['result'][0]['labels'],
-            'values' => array_map('intval', $body['result'][0]['data']),
-        );
-
-        set_transient($transient_key, $result, HOUR_IN_SECONDS);
-
-        return $result;
-    }
 
     public function get_source_payback_data($days = 30, $limit = 10)
     {
@@ -1315,16 +1401,16 @@ class Growtype_Analytics_Admin_Metrics
         $profiles = $this->get_paid_buyer_profiles($settings);
         $cutoff = strtotime('-' . (int)$days . ' days');
         $source_costs = $settings['marketing_spend_by_source'];
-        $sources = array();
+        $sources = array ();
 
         foreach ($profiles as $profile) {
             $source = $profile['acquisition_source'];
 
             if (!isset($sources[$source])) {
-                $sources[$source] = array(
+                $sources[$source] = array (
                     'source' => $profile['acquisition_source_label'],
                     'new_buyers' => 0,
-                    'revenue_30d' => 0.0,
+                    'revenue' => 0.0,
                     'revenue_total' => 0.0,
                 );
             }
@@ -1333,14 +1419,14 @@ class Growtype_Analytics_Admin_Metrics
                 $sources[$source]['new_buyers']++;
             }
 
-            $sources[$source]['revenue_30d'] += $profile['revenue_30d'];
+            $sources[$source]['revenue'] += $profile['revenue'];
             $sources[$source]['revenue_total'] += $profile['revenue_total'];
         }
 
         foreach ($sources as $source_key => &$source) {
             $cost = (float)($source_costs[$source_key] ?? 0);
             $new_buyers = max(0, (int)$source['new_buyers']);
-            $gross_revenue_per_new_buyer = $new_buyers > 0 ? ($source['revenue_30d'] / $new_buyers) : 0;
+            $gross_revenue_per_new_buyer = $new_buyers > 0 ? ($source['revenue'] / $new_buyers) : 0;
 
             $source['cost_30d'] = $cost;
             $source['payback_months_estimate'] = ($cost > 0 && $gross_revenue_per_new_buyer > 0)
@@ -1350,19 +1436,19 @@ class Growtype_Analytics_Admin_Metrics
         unset($source);
 
         uasort($sources, function ($left, $right) {
-            return $right['revenue_30d'] <=> $left['revenue_30d'];
+            return $right['revenue'] <=> $left['revenue'];
         });
 
         $sources = array_slice($sources, 0, $limit, true);
 
         return array_map(function ($source) {
             $new_buyers = max(1, (int)$source['new_buyers']);
-            $gross_revenue_per_new_buyer = $source['revenue_30d'] / $new_buyers;
+            $gross_revenue_per_new_buyer = $source['revenue'] / $new_buyers;
 
-            return array(
+            return array (
                 'source' => $source['source'],
                 'new_buyers' => $this->controller->format_number($source['new_buyers']),
-                'revenue_30d' => $this->controller->format_money($source['revenue_30d']),
+                'revenue' => $this->controller->format_money($source['revenue']),
                 'revenue_total' => $this->controller->format_money($source['revenue_total']),
                 'revenue_per_new_buyer' => $this->controller->format_money($gross_revenue_per_new_buyer),
                 'payback_estimate' => $source['cost_30d'] > 0 ? $source['payback_months_estimate'] . ' mo' : __('N/A', 'growtype-analytics'),
@@ -1399,7 +1485,7 @@ class Growtype_Analytics_Admin_Metrics
         $results = $wpdb->get_results(
             $this->prepare_dynamic_query(
                 $query,
-                array_merge($paid, array((int)$days, (int)$days), $email_exclusion['params'], array((int)$limit))
+                array_merge($paid, array ((int)$days, (int)$days), $email_exclusion['params'], array ((int)$limit))
             ),
             ARRAY_A
         );
@@ -1408,13 +1494,13 @@ class Growtype_Analytics_Admin_Metrics
             $registered = (int)$row['registered_users'];
             $buyers = (int)$row['buyers'];
 
-            return array(
+            return array (
                 'locale' => $row['locale_code'],
                 'registered' => $this->controller->format_number($registered),
                 'buyers' => $this->controller->format_number($buyers),
                 'conversion_rate' => $this->controller->format_percent($registered > 0 ? ($buyers / $registered) * 100 : 0),
             );
-        }, $results ?: array());
+        }, $results ?: array ());
     }
 
     public function get_refund_chargeback_rates_data($days = 30)
@@ -1423,9 +1509,9 @@ class Growtype_Analytics_Admin_Metrics
         $orders = $this->get_order_metrics($days, $settings);
         $paid_orders = max(0, (int)$orders['paid_orders']);
 
-        $margin_page = $this->controller->analytics_page->get_page_by_class('Growtype_Analytics_Admin_Page_Contribution_Margin');
-        $real_cost = $margin_page ? $margin_page->get_real_cost_refund_chargeback_data($days) : array('metrics' => array());
-        $cost_metrics = $real_cost['metrics'] ?? array();
+        $margin_page = $this->controller->get_page_by_class('Growtype_Analytics_Admin_Page_Contribution_Margin');
+        $real_cost = $margin_page ? $margin_page->get_real_cost_refund_chargeback_data($days) : array ('metrics' => array ());
+        $cost_metrics = $real_cost['metrics'] ?? array ();
 
         $refund_orders = (int)($cost_metrics['refund_orders'] ?? 0);
         $chargeback_count = (int)($cost_metrics['known_chargeback_count'] ?? 0);
@@ -1433,7 +1519,7 @@ class Growtype_Analytics_Admin_Metrics
         $refund_amount = (float)($cost_metrics['refund_amount'] ?? 0);
         $chargeback_amount = (float)($cost_metrics['known_chargeback_amount'] ?? 0);
 
-        return array(
+        return array (
             'refund_order_rate' => $paid_orders > 0 ? round(($refund_orders / $paid_orders) * 100, 2) : 0,
             'chargeback_order_rate' => $paid_orders > 0 ? round(($chargeback_count / $paid_orders) * 100, 2) : 0,
             'refund_revenue_rate' => $revenue > 0 ? round(($refund_amount / $revenue) * 100, 2) : 0,
@@ -1449,7 +1535,7 @@ class Growtype_Analytics_Admin_Metrics
         $revenue = $this->get_revenue_trend_daily($days, $settings);
         $buyer_conversion = $this->get_registration_cohort_conversion_daily($days, $settings, 7);
 
-        $rows_by_date = array();
+        $rows_by_date = array ();
 
         foreach ($registrations as $row) {
             $rows_by_date[$row['date']]['date'] = $row['date'];
@@ -1474,9 +1560,9 @@ class Growtype_Analytics_Admin_Metrics
 
         ksort($rows_by_date);
 
-        $formatted = array();
+        $formatted = array ();
         foreach ($rows_by_date as $date => $row) {
-            $formatted[] = array(
+            $formatted[] = array (
                 'date' => $date,
                 'registrations' => (int)($row['registrations'] ?? 0),
                 'paid_orders' => (int)($row['paid_orders'] ?? 0),
@@ -1490,154 +1576,6 @@ class Growtype_Analytics_Admin_Metrics
         return $formatted;
     }
 
-    public function get_top_characters_by_revenue_data($days = 30, $limit = 10)
-    {
-        global $wpdb;
-
-        if (!class_exists('Growtype_Chat_Database')) {
-            return array();
-        }
-
-        $messages_table = $wpdb->prefix . Growtype_Chat_Database::MESSAGES_TABLE;
-        $session_message_table = $wpdb->prefix . Growtype_Chat_Database::SESSION_MESSAGE_TABLE;
-        $user_session_table = $wpdb->prefix . Growtype_Chat_Database::USER_SESSION_TABLE;
-        $chat_users_table = $wpdb->prefix . Growtype_Chat_Database::USERS_TABLE;
-        $characters_table = $wpdb->prefix . 'characters';
-
-        foreach (array($messages_table, $session_message_table, $user_session_table, $chat_users_table, $characters_table) as $table_name) {
-            if (!$this->controller->table_exists($table_name)) {
-                return array();
-            }
-        }
-
-        $settings = $this->get_snapshot_settings();
-        $paid = $settings['paid_statuses'];
-        $paid_placeholders = implode(',', array_fill(0, count($paid), '%s'));
-        $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
-
-        $orders_query = "SELECT
-                customer.meta_value as user_id,
-                p.post_date as paid_at,
-                CAST(total.meta_value AS DECIMAL(10,2)) as revenue
-            FROM `{$wpdb->posts}` p
-            INNER JOIN `{$wpdb->postmeta}` customer ON customer.post_id = p.ID AND customer.meta_key = '_customer_user'
-            INNER JOIN `{$wpdb->postmeta}` total ON total.post_id = p.ID AND total.meta_key = '_order_total'
-            INNER JOIN `{$wpdb->users}` u ON u.ID = customer.meta_value
-            WHERE p.post_type = 'shop_order'
-            AND p.post_status IN ($paid_placeholders)
-            AND p.post_date >= DATE_SUB(NOW(), INTERVAL %d DAY)
-            {$email_exclusion['sql']}
-            ORDER BY p.post_date DESC";
-
-        $orders = $wpdb->get_results(
-            $this->prepare_dynamic_query($orders_query, array_merge($paid, array((int)$days), $email_exclusion['params'])),
-            ARRAY_A
-        );
-
-        if (empty($orders)) {
-            return array();
-        }
-
-        $character_rows = array();
-        $chat_user_cache = array();
-
-        foreach ($orders as $order) {
-            $user_id = (int)$order['user_id'];
-            $paid_at = $order['paid_at'];
-            $revenue = (float)$order['revenue'];
-
-            if (!isset($chat_user_cache[$user_id])) {
-                $chat_user_cache[$user_id] = (int)$wpdb->get_var($wpdb->prepare(
-                    "SELECT id FROM `{$chat_users_table}` WHERE external_id = %d AND type = 'wp_user' LIMIT 1",
-                    $user_id
-                ));
-            }
-
-            $chat_user_id = $chat_user_cache[$user_id];
-            if ($chat_user_id <= 0) {
-                continue;
-            }
-
-            $character_id = $wpdb->get_var($wpdb->prepare(
-                "SELECT bot.external_id
-                FROM `{$messages_table}` m
-                INNER JOIN `{$session_message_table}` sm ON sm.message_id = m.id
-                INNER JOIN `{$user_session_table}` us ON us.session_id = sm.session_id
-                INNER JOIN `{$chat_users_table}` bot ON bot.id = us.user_id
-                WHERE m.user_id = %d
-                AND m.created_at <= %s
-                AND bot.type = 'bot'
-                ORDER BY m.created_at DESC
-                LIMIT 1",
-                $chat_user_id,
-                $paid_at
-            ));
-
-            if (empty($character_id)) {
-                continue;
-            }
-
-            if (!isset($character_rows[$character_id])) {
-                $character_rows[$character_id] = array(
-                    'revenue' => 0.0,
-                    'orders' => 0,
-                    'buyers' => array(),
-                    'name' => '',
-                    'slug' => '',
-                );
-            }
-
-            $character_rows[$character_id]['revenue'] += $revenue;
-            $character_rows[$character_id]['orders']++;
-            $character_rows[$character_id]['buyers'][$user_id] = true;
-        }
-
-        if (empty($character_rows)) {
-            return array();
-        }
-
-        $character_ids = array_keys($character_rows);
-        $placeholders = implode(',', array_fill(0, count($character_ids), '%s'));
-        $character_meta_rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT external_id, slug, metadata FROM `{$characters_table}` WHERE external_id IN ($placeholders)",
-                ...$character_ids
-            ),
-            ARRAY_A
-        );
-
-        foreach ($character_meta_rows as $meta_row) {
-            $character_id = $meta_row['external_id'];
-            if (!isset($character_rows[$character_id])) {
-                continue;
-            }
-
-            $character_rows[$character_id]['slug'] = $meta_row['slug'];
-            $metadata = json_decode($meta_row['metadata'], true);
-            $character_rows[$character_id]['name'] = $metadata['details']['character_title'] ?? $meta_row['slug'];
-        }
-
-        uasort($character_rows, function ($left, $right) {
-            return $right['revenue'] <=> $left['revenue'];
-        });
-
-        $character_rows = array_slice($character_rows, 0, $limit, true);
-
-        $formatted = array();
-        foreach ($character_rows as $character) {
-            $buyers = count($character['buyers']);
-            $formatted[] = array(
-                'character_name' => $character['name'] ?: $character['slug'] ?: __('Unknown', 'growtype-analytics'),
-                'slug' => $character['slug'] ?: 'unknown',
-                'revenue' => $this->controller->format_money($character['revenue']),
-                'orders' => $this->controller->format_number($character['orders']),
-                'buyers' => $this->controller->format_number($buyers),
-                'revenue_per_buyer' => $this->controller->format_money($buyers > 0 ? ($character['revenue'] / $buyers) : 0),
-            );
-        }
-
-        return $formatted;
-    }
 
     private function get_registration_trend_daily($days, $settings)
     {
@@ -1652,13 +1590,13 @@ class Growtype_Analytics_Admin_Metrics
             ORDER BY registered_date ASC";
 
         $results = $wpdb->get_results(
-            $this->prepare_dynamic_query($query, array_merge(array((int)$days), $email_exclusion['params'])),
+            $this->prepare_dynamic_query($query, array_merge(array ((int)$days), $email_exclusion['params'])),
             ARRAY_A
         );
 
-        $daily = array();
-        foreach ($results ?: array() as $row) {
-            $daily[] = array(
+        $daily = array ();
+        foreach ($results ?: array () as $row) {
+            $daily[] = array (
                 'date' => $row['registered_date'],
                 'count' => (int)$row['registrations'],
             );
@@ -1685,13 +1623,13 @@ class Growtype_Analytics_Admin_Metrics
             ORDER BY order_date ASC";
 
         $results = $wpdb->get_results(
-            $this->prepare_dynamic_query($query, array_merge($settings['paid_statuses'], array((int)$days), $email_exclusion['params'])),
+            $this->prepare_dynamic_query($query, array_merge($settings['paid_statuses'], array ((int)$days), $email_exclusion['params'])),
             ARRAY_A
         );
 
-        $daily = array();
-        foreach ($results ?: array() as $row) {
-            $daily[] = array(
+        $daily = array ();
+        foreach ($results ?: array () as $row) {
+            $daily[] = array (
                 'date' => $row['order_date'],
                 'count' => (int)$row['paid_orders'],
             );
@@ -1731,17 +1669,17 @@ class Growtype_Analytics_Admin_Metrics
 
         $params = array_merge(
             $settings['paid_statuses'],
-            array((int)$window_days, (int)$days),
+            array ((int)$window_days, (int)$days),
             $email_exclusion['params']
         );
 
         $results = $wpdb->get_results($this->prepare_dynamic_query($query, $params), ARRAY_A);
 
-        $daily = array();
-        foreach ($results ?: array() as $row) {
+        $daily = array ();
+        foreach ($results ?: array () as $row) {
             $registrations = (int)$row['registrations'];
             $buyers_within_window = (int)$row['buyers_within_window'];
-            $daily[] = array(
+            $daily[] = array (
                 'date' => $row['cohort_date'],
                 'buyers_within_window' => $buyers_within_window,
                 'conversion_rate' => $registrations > 0 ? round(($buyers_within_window / $registrations) * 100, 2) : 0,
@@ -1763,79 +1701,11 @@ class Growtype_Analytics_Admin_Metrics
             $start_date
         ), OBJECT_K);
 
-        $data = array();
+        $data = array ();
         foreach ($results as $date => $row) {
             $data[$date] = (int)$row->count;
         }
         return $data;
     }
 
-    public function get_posthog_unique_users_data($days)
-    {
-        $api_key = get_option('growtype_analytics_posthog_details_api_key');
-        $project_id = get_option('growtype_analytics_posthog_details_project_id');
-        $host = get_option('growtype_analytics_posthog_details_host', 'https://eu.i.posthog.com');
-
-        if (empty($api_key) || empty($project_id)) {
-            return array('labels' => array(), 'values' => array());
-        }
-
-        $transient_key = 'growtype_analytics_posthog_dau_' . $days;
-        $cached = get_transient($transient_key);
-        if ($cached !== false) {
-            return $cached;
-        }
-
-        $host = rtrim($host, '/');
-        $date_from = '-' . ($days - 1) . 'd';
-
-        $url = add_query_arg(array(
-            'insight'   => 'TRENDS',
-            'interval'  => 'day',
-            'date_from' => $date_from,
-            'events'    => json_encode(array(
-                array(
-                    'id'   => '$pageview',
-                    'math' => 'dau'
-                )
-            ))
-        ), $host . '/api/projects/' . $project_id . '/insights/trend/');
-
-        $response = wp_remote_get($url, array(
-            'headers' => array(
-                'Authorization' => 'Bearer ' . $api_key,
-                'Content-Type'  => 'application/json',
-            ),
-            'timeout' => 15
-        ));
-
-        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-            return array('labels' => array(), 'values' => array());
-        }
-
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        if (empty($body['result']) || !isset($body['result'][0]['data'])) {
-            return array('labels' => array(), 'values' => array());
-        }
-
-        $result_data = $body['result'][0]['data'];
-        $result_labels = $body['result'][0]['labels'];
-
-        $labels = array();
-        $values = array();
-
-        foreach ($result_labels as $index => $label) {
-            $labels[] = date('M d', strtotime($label));
-            $values[] = (int) ($result_data[$index] ?? 0);
-        }
-
-        $result = array(
-            'labels' => $labels,
-            'values' => $values
-        );
-
-        set_transient($transient_key, $result, HOUR_IN_SECONDS);
-
-        return $result;
-    }
 }

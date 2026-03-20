@@ -45,10 +45,10 @@ class Growtype_Analytics_Admin_Page_Contribution_Margin extends Growtype_Analyti
         );
     }
 
-    public function get_contribution_margin_data()
+    public function get_contribution_margin_data($days = 30)
     {
         $margin_settings = $this->get_margin_settings();
-        $metrics = $this->get_contribution_margin_metrics(30, $margin_settings);
+        $metrics = $this->get_contribution_margin_metrics($days, $margin_settings);
 
         return array(
             'metrics' => $metrics,
@@ -197,20 +197,51 @@ class Growtype_Analytics_Admin_Page_Contribution_Margin extends Growtype_Analyti
     public function render_page()
     {
         $this->render_page_header(__('Contribution Margin', 'growtype-analytics'));
+
+        $date_from = isset($_GET['date_from']) ? sanitize_text_field($_GET['date_from']) : date('Y-m-d', strtotime('-30 days'));
+        $date_to = isset($_GET['date_to']) ? sanitize_text_field($_GET['date_to']) : date('Y-m-d');
+        $days = max(1, (int)((strtotime($date_to) - strtotime($date_from)) / 86400));
         
-        $data = $this->get_contribution_margin_data();
+        $snapshot_settings = $this->controller->get_snapshot_settings();
+        $objective = $snapshot_settings['growth_objective'] ?? '10x';
+        $marketing_spend = $snapshot_settings['marketing_spend'] ?? 0;
+
+        $this->controller->decision_renderer->render_dashboard_filters($date_from, $date_to, $objective, $marketing_spend, $this->get_menu_slug());
+        
+        $paged = isset($_GET['paged']) ? max(1, (int)$_GET['paged']) : 1;
+        $per_page = Growtype_Analytics_Admin_Table_Renderer::DEFAULT_PER_PAGE;
+        $offset = ($paged - 1) * $per_page;
+
+        $margin_data = $this->get_contribution_margin_data($days);
+        $real_data = $this->get_real_cost_refund_chargeback_data($days);
+        
+        $metrics = $real_data['metrics']; // Focusing on net metrics
+        $combined_rows_all = $real_data['rows'];
+        $total_items = count($combined_rows_all);
+        $combined_rows = array_slice($combined_rows_all, $offset, $per_page);
+        
         $renderer = $this->controller->decision_renderer;
-        $metrics = $data['metrics'];
         ?>
         <div class="analytics-section">
-            <h2><?php _e('Estimated 30 Day Margin', 'growtype-analytics'); ?></h2>
-            <p class="description"><?php _e('Uses your configurable cost assumptions from Settings > Growtype - Analytics.', 'growtype-analytics'); ?></p>
+            <h2><?php _e('Contribution Margin Analysis', 'growtype-analytics'); ?></h2>
+            <p class="description"><?php printf(__('Financial breakdown including estimated costs, refunds, and chargebacks for the last %d days.', 'growtype-analytics'), $days); ?></p>
+            
             <div class="analytics-scale-snapshot-grid">
-                <?php $renderer->render_snapshot_card(__('Revenue 30d', 'growtype-analytics'), $this->controller->format_money($metrics['revenue']), __('Paid order revenue', 'growtype-analytics')); ?>
-                <?php $renderer->render_snapshot_card(__('Contribution Margin', 'growtype-analytics'), $this->controller->format_money($metrics['contribution_margin']), __('Revenue minus estimated variable + fixed costs', 'growtype-analytics')); ?>
-                <?php $renderer->render_snapshot_card(__('Margin %', 'growtype-analytics'), $this->controller->format_percent($metrics['contribution_margin_percent']), __('Estimated contribution margin percentage', 'growtype-analytics')); ?>
+                <?php $renderer->render_snapshot_card(__('Refund Amount', 'growtype-analytics'), $this->controller->format_money($metrics['refund_amount']), __('Actual WooCommerce refund posts', 'growtype-analytics')); ?>
+                <?php $renderer->render_snapshot_card(__('Known Chargeback Amount', 'growtype-analytics'), $this->controller->format_money($metrics['known_chargeback_amount']), __('Configured from Settings', 'growtype-analytics')); ?>
+                <?php $renderer->render_snapshot_card(__('Net After Refunds & Chargebacks', 'growtype-analytics'), $this->controller->format_money($metrics['net_after_refunds_chargebacks']), __('Contribution margin after refunds and known chargebacks', 'growtype-analytics')); ?>
+                <?php $renderer->render_snapshot_card(__('Net Margin %', 'growtype-analytics'), $this->controller->format_percent($metrics['net_margin_percent']), __('Net after refunds and chargebacks / revenue', 'growtype-analytics')); ?>
             </div>
-            <?php $renderer->render_growth_table(array('Metric', 'Value'), $data['rows']); ?>
+
+            <?php 
+            $this->controller->table_renderer->render(
+                array(__('Metric', 'growtype-analytics'), __('Value', 'growtype-analytics')), 
+                $combined_rows,
+                $total_items,
+                $per_page,
+                $paged
+            ); 
+            ?>
         </div>
         <?php
         $this->render_page_footer();

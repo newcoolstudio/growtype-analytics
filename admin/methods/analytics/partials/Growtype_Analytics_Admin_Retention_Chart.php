@@ -53,6 +53,11 @@ class Growtype_Analytics_Admin_Retention_Chart
     {
         check_ajax_referer('growtype_analytics_nonce', 'nonce');
 
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Unauthorized', 403);
+            return;
+        }
+
         $period = isset($_POST['period']) ? sanitize_text_field($_POST['period']) : 'week';
         $days = ($period === 'month') ? 30 : 7;
 

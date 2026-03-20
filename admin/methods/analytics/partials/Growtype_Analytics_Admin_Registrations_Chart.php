@@ -51,6 +51,11 @@ class Growtype_Analytics_Admin_Registrations_Chart
     {
         check_ajax_referer('growtype_analytics_nonce', 'nonce');
 
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Unauthorized', 403);
+            return;
+        }
+
         $period = isset($_POST['period']) ? sanitize_text_field($_POST['period']) : 'week';
         $days = ($period === 'month') ? 30 : 7;
 
@@ -61,13 +66,13 @@ class Growtype_Analytics_Admin_Registrations_Chart
             $debug = array();
             
             // Get registration data from PostHog
-            $posthog_registrations = $this->get_posthog_registrations_data($days, $debug);
+            $posthog_registrations = $this->controller->posthog->get_registrations_data($days, $debug);
 
             // Get registration data from WP local DB
             $wp_registrations = $this->get_daily_registrations_data($days);
 
             // Get unique users data from PostHog
-            $posthog_unique_users = $this->controller->metrics->get_posthog_unique_users_data($days);
+            $posthog_unique_users = $this->controller->posthog->get_unique_users_trend($days);
 
             $data = array(
                 'labels' => $wp_registrations['labels'],
@@ -98,65 +103,7 @@ class Growtype_Analytics_Admin_Registrations_Chart
         ));
     }
 
-    /**
-     * Get registration data from PostHog API
-     */
-    private function get_posthog_registrations_data($days, &$debug)
-    {
-        // ... (existing code is mostly fine as it already does one call for the range)
-        $api_key = get_option('growtype_analytics_posthog_details_api_key');
-        $project_id = get_option('growtype_analytics_posthog_details_project_id');
-        $host = get_option('growtype_analytics_posthog_details_host', 'https://eu.i.posthog.com');
 
-        if (empty($api_key) || empty($project_id)) {
-            return array('labels' => array(), 'values' => array());
-        }
-
-        $host = rtrim($host, '/');
-        $date_from = '-' . ($days - 1) . 'd';
-
-        $url = add_query_arg(array(
-            'insight'   => 'TRENDS',
-            'interval'  => 'day',
-            'date_from' => $date_from,
-            'events'    => json_encode(array(
-                array(
-                    'id'   => 'growtype_analytics_wp_user_registered',
-                    'math' => 'dau'
-                )
-            ))
-        ), $host . '/api/projects/' . $project_id . '/insights/trend/');
-
-        $response = wp_remote_get($url, array(
-            'headers' => array(
-                'Authorization' => 'Bearer ' . $api_key,
-                'Content-Type'  => 'application/json',
-            ),
-            'timeout' => 15
-        ));
-
-        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-            return array('labels' => array(), 'values' => array());
-        }
-
-        $data = json_decode(wp_remote_retrieve_body($response), true);
-        if (empty($data['result']) || !isset($data['result'][0]['data'])) {
-            return array('labels' => array(), 'values' => array());
-        }
-
-        $result_data = $data['result'][0]['data'];
-        $result_labels = $data['result'][0]['labels'];
-
-        $labels = array();
-        $values = array();
-
-        foreach ($result_labels as $index => $label) {
-            $labels[] = date('M d', strtotime($label));
-            $values[] = (int) ($result_data[$index] ?? 0);
-        }
-
-        return array('labels' => $labels, 'values' => $values);
-    }
 
     /**
      * Get daily registrations data for the specified number of days

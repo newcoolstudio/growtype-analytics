@@ -26,11 +26,11 @@ class Growtype_Analytics_Admin_Settings
     {
         $this->handle_share_access_actions();
 
-        $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'tracking';
+        $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'status';
         $tabs = $this->get_settings_tabs();
 
         if (!isset($tabs[$tab])) {
-            $tab = 'tracking';
+            $tab = 'status';
         }
 
         echo '<div class="wrap">';
@@ -54,6 +54,8 @@ class Growtype_Analytics_Admin_Settings
         echo '<p class="description" style="margin-top: 12px;">' . esc_html($this->get_tab_description($tab)) . '</p>';
         if ($tab === 'share-access') {
             $this->render_share_access_tab();
+        } elseif ($tab === 'status') {
+            $this->render_status_tab();
         } else {
             echo '<form method="post" action="options.php">';
 
@@ -338,6 +340,7 @@ class Growtype_Analytics_Admin_Settings
     private function get_settings_tabs()
     {
         return [
+            'status' => __('Status', 'growtype-analytics'),
             'tracking' => __('Tracking codes / credentials', 'growtype-analytics'),
             'decision' => __('Decision snapshot', 'growtype-analytics'),
             'share-access' => __('Shared access URLs', 'growtype-analytics'),
@@ -350,6 +353,7 @@ class Growtype_Analytics_Admin_Settings
             'tracking' => __('Manage tracking integrations and analytics credentials used across the project.', 'growtype-analytics'),
             'decision' => __('Configure the scale-or-pivot snapshot, churn logic, and contribution margin assumptions.', 'growtype-analytics'),
             'share-access' => __('Create read-only URLs you can share without giving wp-admin access.', 'growtype-analytics'),
+            'status' => __('Verify the connection status of configured analytics services.', 'growtype-analytics'),
         ];
 
         return $descriptions[$tab] ?? '';
@@ -494,5 +498,62 @@ class Growtype_Analytics_Admin_Settings
                 ),
             ];
         }, $links);
+    }
+
+    private function render_status_tab()
+    {
+        $gtm_enabled = get_option('growtype_analytics_gtm_details_enabled');
+        $gtm_id = get_option('growtype_analytics_gtm_details_gtm_id');
+        $ga4_id = get_option('growtype_analytics_ga4_details_ga4_id');
+        $posthog_api_key = get_option('growtype_analytics_posthog_details_api_key');
+
+        ?>
+        <div class="analytics-config-status" style="margin-top: 2rem;">
+            <table class="wp-list-table widefat fixed">
+                <thead>
+                <tr>
+                    <th><?php _e('Service', 'growtype-analytics'); ?></th>
+                    <th><?php _e('Status', 'growtype-analytics'); ?></th>
+                    <th><?php _e('Configuration', 'growtype-analytics'); ?></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td><strong>Google Tag Manager</strong></td>
+                    <td>
+                        <?php if ($gtm_enabled && !empty($gtm_id)): ?>
+                            <span class="status-badge status-active">✓ Active</span>
+                        <?php else: ?>
+                            <span class="status-badge status-inactive">○ Inactive</span>
+                        <?php endif; ?>
+                    </td>
+                    <td><?php echo !empty($gtm_id) ? esc_html($gtm_id) : __('Not configured', 'growtype-analytics'); ?></td>
+                </tr>
+                <tr>
+                    <td><strong>Google Analytics 4</strong></td>
+                    <td>
+                        <?php if (!empty($ga4_id)): ?>
+                            <span class="status-badge status-active">✓ Active</span>
+                        <?php else: ?>
+                            <span class="status-badge status-inactive">○ Inactive</span>
+                        <?php endif; ?>
+                    </td>
+                    <td><?php echo !empty($ga4_id) ? esc_html($ga4_id) : __('Not configured', 'growtype-analytics'); ?></td>
+                </tr>
+                <tr>
+                    <td><strong>PostHog</strong></td>
+                    <td>
+                        <?php if (!empty($posthog_api_key)): ?>
+                            <span class="status-badge status-active">✓ Active</span>
+                        <?php else: ?>
+                            <span class="status-badge status-inactive">○ Inactive</span>
+                        <?php endif; ?>
+                    </td>
+                    <td><?php echo !empty($posthog_api_key) ? __('Configured', 'growtype-analytics') : __('Not configured', 'growtype-analytics'); ?></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <?php
     }
 }

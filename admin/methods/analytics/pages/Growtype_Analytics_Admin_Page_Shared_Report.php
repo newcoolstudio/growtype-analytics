@@ -17,13 +17,7 @@ class Growtype_Analytics_Admin_Page_Shared_Report
         $cache_key = 'growtype_analytics_shared_report_v3_' . $token;
         
         if ($refresh) {
-            $lock_key = 'gt_payload_refresh_lock_' . $token;
-            if (get_transient($lock_key)) {
-                $refresh = false; // Fresh enough!
-            } else {
-                set_transient($lock_key, true, 300); // 5 min cooldown
-                delete_transient($cache_key);
-            }
+            delete_transient($cache_key);
         }
 
         $cached_payload = get_transient($cache_key);
@@ -33,11 +27,16 @@ class Growtype_Analytics_Admin_Page_Shared_Report
         }
 
         // Fetch all fragments. In the future, this can be called selectively via AJAX.
+        $overview = $this->get_fragment('overview', $link, $refresh);
+        $pd = !empty($overview['active_period_string']) ? $overview['active_period_string'] : (!empty($overview['active_period_days']) ? $overview['active_period_days'] . 'd' : '30d');
+
         $payload = array(
             'generated_at' => current_time('mysql'),
             'label' => !empty($link['label']) ? $link['label'] : __('Shared Business Report', 'growtype-analytics'),
-            'overview' => $this->get_fragment('overview', $link, $refresh),
+            'period' => $pd,
+            'overview' => $overview,
             'execution_kpis' => $this->get_fragment('execution_kpis', $link, $refresh),
+            'payment_failure_segmentation' => $this->get_fragment('payment_failure_segmentation', $link, $refresh),
             'source_attribution' => $this->get_fragment('source_attribution', $link, $refresh),
             'traffic_funnel' => $this->get_fragment('traffic_funnel', $link, $refresh),
             'cac_by_source' => $this->get_fragment('cac_by_source', $link, $refresh),
@@ -66,13 +65,7 @@ class Growtype_Analytics_Admin_Page_Shared_Report
         $cache_key = 'growtype_analytics_shared_fragment_' . $fragment . '_' . $token;
 
         if ($refresh) {
-            $lock_key = 'gt_refresh_lock_' . $token . '_' . $fragment;
-            if (get_transient($lock_key)) {
-                $refresh = false; // Fresh enough!
-            } else {
-                set_transient($lock_key, true, 300); // 5 min cooldown
-                delete_transient($cache_key);
-            }
+            delete_transient($cache_key);
         }
 
         $cached = get_transient($cache_key);
@@ -87,16 +80,16 @@ class Growtype_Analytics_Admin_Page_Shared_Report
                 $data = array(
                     'registered_users_total' => $metrics['registered_users_total'],
                     'new_users_7d' => $metrics['new_users_7d'],
-                    'new_users_30d' => $metrics['new_users_30d'],
+                    'new_users' => $metrics['new_users'],
                     'activation_min_messages' => $metrics['activation_min_messages'],
                     'activation_window_days' => $metrics['activation_window_days'],
                     'activation_rate_7d' => $metrics['activation_rate_7d'],
-                    'activation_rate_30d' => $metrics['activation_rate_30d'],
+                    'activation_rate' => $metrics['activation_rate'],
                     'buyers_total' => $metrics['buyers_total'],
                     'buyer_conversion_total' => $metrics['buyer_conversion_total'],
-                    'new_user_to_buyer_conversion_30d' => $metrics['new_user_to_buyer_conversion_30d'],
-                    'revenue_30d' => $metrics['revenue_30d'],
-                    'payment_success_rate_30d' => $metrics['payment_success_rate_30d'],
+                    'new_user_to_buyer_conversion' => $metrics['new_user_to_buyer_conversion'],
+                    'revenue' => $metrics['revenue'],
+                    'payment_success_rate' => $metrics['payment_success_rate'],
                     'repurchase_rate_total' => $metrics['repurchase_rate_total'],
                     'arppu_total' => $metrics['arppu_total'],
                     'dau' => $metrics['dau'],
@@ -106,8 +99,8 @@ class Growtype_Analytics_Admin_Page_Shared_Report
                     'churn_inactivity_days' => $metrics['churn_inactivity_days'],
                     'recent_payer_window_days' => $metrics['recent_payer_window_days'],
                     'churn_risk_recent_payers' => $metrics['churn_risk_recent_payers'],
-                    'aov_30d' => $metrics['aov_30d'],
-                    'revenue_prev_30d' => $metrics['revenue_prev_30d'],
+                    'aov' => $metrics['aov'],
+                    'revenue_prev' => $metrics['revenue_prev'],
                     'revenue_growth_mom' => $metrics['revenue_growth_mom'],
                     'new_users_prev_7d' => $metrics['new_users_prev_7d'],
                     'new_users_growth_wow' => $metrics['new_users_growth_wow'],
@@ -117,34 +110,62 @@ class Growtype_Analytics_Admin_Page_Shared_Report
                     'user_churn_rate' => $metrics['user_churn_rate'],
                     'median_days_to_first_purchase' => $metrics['median_days_to_first_purchase'],
                     'cac_estimate' => $metrics['cac_estimate'],
-                    'revenue_daily_30d' => $metrics['revenue_daily_30d'],
+                    'revenue_daily' => $metrics['revenue_daily'],
+                    'active_period_days' => $metrics['active_period_days'] ?? 30,
+                    'active_period_string' => $metrics['active_period_string'] ?? '',
                     'settings' => $metrics['settings'],
                 );
+                // Merge all metrics to ensure map has access to everything
+                $data = array_merge($metrics, $data);
                 break;
 
             case 'execution_kpis':
                 $metrics = $this->controller->get_snapshot_metrics($refresh);
-                $failure_segments = $this->controller->get_payment_failure_segments_data($metrics['settings'], 30, 25);
+                $pd = $metrics['active_period_days'] ?? 30;
+                $failure_segments = $this->controller->get_payment_failure_segments_data($metrics['settings'], $pd, 25);
                 $data = array(
-                    'payment_success_rate_30d' => $metrics['payment_success_rate_30d'],
-                    'new_user_to_buyer_conversion_30d' => $metrics['new_user_to_buyer_conversion_30d'],
+                    'payment_success_rate' => $metrics['payment_success_rate'],
+                    'new_user_to_buyer_conversion' => $metrics['new_user_to_buyer_conversion'],
                     'new_user_to_buyer_conversion_daily' => $metrics['new_user_to_buyer_conversion_daily'],
                     'repurchase_rate_total' => $metrics['repurchase_rate_total'],
-                    'unpaid_attempts_30d' => $metrics['unpaid_attempts_30d'],
+                    'unpaid_attempts' => $metrics['unpaid_attempts'],
+                    'active_period_days' => $metrics['active_period_days'] ?? 30,
+                    'registered_users_total' => $metrics['registered_users_total'],
                     'payment_failure_segments' => $failure_segments,
+                    'settings' => $metrics['settings'],
                 );
+                // Merge all metrics to ensure map has access to everything
+                $data = array_merge($metrics, $data);
+                break;
+            case 'payment_failure_segmentation':
+                $metrics = $this->controller->get_snapshot_metrics($refresh);
+                $pd = $metrics['active_period_days'] ?? 30;
+                $failure_segments = $this->controller->get_payment_failure_segments_data($metrics['settings'], $pd, 25);
+                $data = array(
+                    'active_period_days' => $pd,
+                    'payment_failure_segments' => $failure_segments,
+                    'settings' => $metrics['settings'],
+                );
+                $data = array_merge($metrics, $data);
                 break;
 
             case 'source_attribution':
-                $data = $this->controller->get_source_attribution_rows(20);
+                $metrics = $this->controller->get_snapshot_metrics($refresh);
+                $pd = $metrics['active_period_days'] ?? 30;
+                $data = $this->controller->get_source_attribution_rows($pd);
                 break;
 
             case 'traffic_funnel':
-                $data = $this->controller->get_traffic_funnel_data(30);
+                $metrics = $this->controller->get_snapshot_metrics($refresh);
+                $pd = $metrics['active_period_days'] ?? 30;
+                $data = $this->controller->get_traffic_funnel_data($pd);
                 break;
 
             case 'cac_by_source':
-                $data = $this->controller->get_cac_by_source_data(30, 10);
+                $metrics = $this->controller->get_snapshot_metrics($refresh);
+                $pd = $metrics['active_period_days'] ?? 30;
+                $data = $this->controller->get_cac_by_source_data($pd, 10);
+                $data['active_period_days'] = $pd; // Pass to renderer
                 break;
 
             case 'retention_by_source':
@@ -278,8 +299,14 @@ class Growtype_Analytics_Admin_Page_Shared_Report
 
             <div id="section-execution_kpis" class="analytics-section">
                 <h2><?php _e('Execution KPIs', 'growtype-analytics'); ?></h2>
-                <p class="description"><?php _e('Payment success, new-user-to-buyer conversion, repurchase rate, and payment-failure segmentation.', 'growtype-analytics'); ?></p>
+                <p class="description"><?php _e('Core business metrics for tracking short-term growth and payment health.', 'growtype-analytics'); ?></p>
                 <div class="section-content"><div class="section-loading"><?php _e('Loading KPIs...', 'growtype-analytics'); ?></div></div>
+            </div>
+
+            <div id="section-payment_failure_segmentation" class="analytics-section">
+                <h2><?php _e('Payment Failure Segmentation', 'growtype-analytics'); ?></h2>
+                <p class="description"><?php _e('Breakdown of unsuccessful payment attempts by device, country, and gateway.', 'growtype-analytics'); ?></p>
+                <div class="section-content"><div class="section-loading"><?php _e('Loading data...', 'growtype-analytics'); ?></div></div>
             </div>
 
             <div id="section-source_attribution" class="analytics-section">
@@ -367,7 +394,7 @@ class Growtype_Analytics_Admin_Page_Shared_Report
                 const baseUrl = <?php echo json_encode(get_rest_url(null, 'growtype-analytics/v1/shared-report/')); ?>;
                 
                 const sections = [
-                    'overview', 'execution_kpis', 'source_attribution', 'traffic_funnel', 
+                    'overview', 'execution_kpis', 'payment_failure_segmentation', 'source_attribution', 'traffic_funnel', 
                     'cac_by_source', 'retention_by_source', 'source_payback', 'language_conversion',
                     'funnel_dropoff_30d', 'offer_tests', 'offer_repurchase_quality', 
                     'top_characters_by_revenue', 'buyer_cohorts', 'growth_trends_30d',
@@ -413,8 +440,11 @@ class Growtype_Analytics_Admin_Page_Shared_Report
             case 'execution_kpis':
                 $this->decision_renderer->render_execution_kpis($data);
                 break;
+            case 'payment_failure_segmentation':
+                $this->decision_renderer->render_payment_failure_segmentation($data);
+                break;
             case 'source_attribution':
-                $this->decision_renderer->render_growth_table(array('Source Type', 'Source', 'Campaign', 'Paid Orders', 'Attempts', 'Success Rate', 'Revenue', 'AOV'), $data);
+                $this->controller->table_renderer->render(array('Source Type', 'Source', 'Campaign', 'Paid Orders', 'Attempts', 'Success Rate', 'Revenue', 'AOV'), $data);
                 break;
             case 'traffic_funnel':
                 ?>
@@ -423,35 +453,36 @@ class Growtype_Analytics_Admin_Page_Shared_Report
                 </p>
                 <?php
                 $this->decision_renderer->render_funnel_cards($data);
-                $this->decision_renderer->render_growth_table(array('Stage', 'Users', 'Vs Previous', 'Vs First'), $data['rows']);
+                $this->controller->table_renderer->render(array('Stage', 'Users', 'Vs Previous', 'Vs First'), $data['rows']);
                 break;
             case 'cac_by_source':
-                $this->decision_renderer->render_growth_table(array('Source', 'New Buyers 30d', 'Active Buyers 30d', 'Revenue 30d', 'Spend 30d', 'CAC', 'ROAS'), $data);
+                $pd = !empty($data['active_period_days']) ? $data['active_period_days'] : 30;
+                $this->controller->table_renderer->render(array('Source', "New Buyers {$pd}d", "Active Buyers {$pd}d", "Revenue {$pd}d", "Spend {$pd}d", 'CAC', 'ROAS'), $data);
                 break;
             case 'retention_by_source':
-                $this->decision_renderer->render_growth_table(array('Source', 'Buyers', 'Repeat 30d', 'Repeat Rate 30d', 'Active 30d', 'Active Rate 30d', 'ARPPU'), $data);
+                $this->controller->table_renderer->render(array('Source', 'Buyers', 'Repeat 30d', 'Repeat Rate 30d', 'Active 30d', 'Active Rate 30d', 'ARPPU'), $data);
                 break;
             case 'source_payback':
-                $this->decision_renderer->render_growth_table(array('Source', 'New Buyers 30d', 'Revenue 30d', 'Revenue Total', '30d Revenue / New Buyer', 'Payback Estimate'), $data);
+                $this->controller->table_renderer->render(array('Source', 'New Buyers 30d', 'Revenue 30d', 'Revenue Total', '30d Revenue / New Buyer', 'Payback Estimate'), $data);
                 break;
             case 'language_conversion':
-                $this->decision_renderer->render_growth_table(array('Locale', 'Registered 30d', 'Buyers 30d', 'Conversion Rate'), $data);
+                $this->controller->table_renderer->render(array('Locale', 'Registered 30d', 'Buyers 30d', 'Conversion Rate'), $data);
                 break;
             case 'funnel_dropoff_30d':
                 $this->decision_renderer->render_funnel_cards(array('rows' => $data));
-                $this->decision_renderer->render_growth_table(array('Stage', 'Users', 'Vs Previous', 'Vs First'), $data);
+                $this->controller->table_renderer->render(array('Stage', 'Users', 'Vs Previous', 'Vs First'), $data);
                 break;
             case 'offer_tests':
-                $this->decision_renderer->render_growth_table(array('Offer', 'Paid Orders', 'Failed Attempts', 'Success Rate', 'Revenue', 'Avg Revenue / Order'), $data);
+                $this->controller->table_renderer->render(array('Offer', 'Paid Orders', 'Failed Attempts', 'Success Rate', 'Revenue', 'Avg Revenue / Order'), $data);
                 break;
             case 'offer_repurchase_quality':
-                $this->decision_renderer->render_growth_table(array('First Offer', 'Buyers', 'Repeat 30d', 'Repeat Rate 30d', 'Repeat Ever', 'Repeat Rate Ever', 'ARPPU'), $data);
+                $this->controller->table_renderer->render(array('First Offer', 'Buyers', 'Repeat 30d', 'Repeat Rate 30d', 'Repeat Ever', 'Repeat Rate Ever', 'ARPPU'), $data);
                 break;
             case 'top_characters_by_revenue':
-                $this->decision_renderer->render_growth_table(array('Character', 'Slug', 'Revenue 30d', 'Orders', 'Buyers', 'Revenue / Buyer'), $data);
+                $this->controller->table_renderer->render(array('Character', 'Slug', 'Revenue 30d', 'Orders', 'Buyers', 'Revenue / Buyer'), $data);
                 break;
             case 'buyer_cohorts':
-                $this->decision_renderer->render_growth_table(array('Cohort', 'Buyers', 'Repeat in 30d', 'Repeat Rate 30d', 'Revenue', 'ARPPU'), $data);
+                $this->controller->table_renderer->render(array('Cohort', 'Buyers', 'Repeat in 30d', 'Repeat Rate 30d', 'Revenue', 'ARPPU'), $data);
                 break;
             case 'growth_trends_30d':
                 ?>
@@ -467,7 +498,7 @@ class Growtype_Analytics_Admin_Page_Shared_Report
                         $this->controller->format_percent($row['conversion_rate']),
                     );
                 }, $data);
-                $this->decision_renderer->render_growth_table(array('Date', 'Registrations', 'Paid Orders', '7d Buyers', 'Revenue', '7d Cohort Conversion'), $trend_rows);
+                $this->controller->table_renderer->render(array('Date', 'Registrations', 'Paid Orders', '7d Buyers', 'Revenue', '7d Cohort Conversion'), $trend_rows);
                 break;
             case 'contribution_margin':
                 ?>
@@ -476,7 +507,7 @@ class Growtype_Analytics_Admin_Page_Shared_Report
                     <?php $this->decision_renderer->render_snapshot_card(__('Contribution Margin', 'growtype-analytics'), $this->controller->format_money($data['metrics']['contribution_margin']), __('Revenue minus estimated variable + fixed costs', 'growtype-analytics')); ?>
                     <?php $this->decision_renderer->render_snapshot_card(__('Margin %', 'growtype-analytics'), $this->controller->format_percent($data['metrics']['contribution_margin_percent']), __('Estimated contribution margin percentage', 'growtype-analytics')); ?>
                 </div>
-                <?php $this->decision_renderer->render_growth_table(array('Metric', 'Value'), $data['rows']); ?>
+                <?php $this->controller->table_renderer->render(array('Metric', 'Value'), $data['rows']); ?>
                 <?php
                 break;
             case 'real_cost_refund_chargeback':
@@ -496,7 +527,7 @@ class Growtype_Analytics_Admin_Page_Shared_Report
                         <?php $this->decision_renderer->render_snapshot_card(__('Chargeback Rate', 'growtype-analytics'), $this->controller->format_percent($rates['chargeback_order_rate']), __('Known chargebacks / paid orders in the last 30 days', 'growtype-analytics')); ?>
                     <?php endif; ?>
                 </div>
-                <?php $this->decision_renderer->render_growth_table(array('Metric', 'Value'), $rows); ?>
+                <?php $this->controller->table_renderer->render(array('Metric', 'Value'), $rows); ?>
                 <?php
                 break;
         }

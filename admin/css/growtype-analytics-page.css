@@ -17,11 +17,11 @@
 /* Analytics Sections */
 .analytics-section {
     background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 4px;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    border: none;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .analytics-section-header {
@@ -138,26 +138,59 @@
 
 .analytics-scale-snapshot-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 16px;
     margin-top: 18px;
 }
 
 .analytics-snapshot-card {
-    background: #f6f7f7;
-    border: 1px solid #dcdcde;
-    border-radius: 8px;
-    padding: 16px;
+    background: #ffffff;
+    border: 1px solid #f0f0f1;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Execution KPIs Reordering */
+.analytics-section h2:contains("Execution KPIs") + .description + .analytics-scale-snapshot-grid .analytics-snapshot-card,
+.analytics-section:has(h2:contains("Execution KPIs")) .analytics-snapshot-card {
+    cursor: grab;
+}
+
+.analytics-section h2:contains("Execution KPIs") + .description + .analytics-scale-snapshot-grid .analytics-snapshot-card:active,
+.analytics-section:has(h2:contains("Execution KPIs")) .analytics-snapshot-card:active {
+    cursor: grabbing;
+}
+
+.ui-sortable-placeholder {
+    visibility: visible !important;
+    background: rgba(0, 0, 0, 0.02) !important;
+    border: 2px dashed #dcdcde !important;
+    border-radius: 10px;
+}
+
+.ui-sortable-helper {
+    transform: scale(1.02);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1) !important;
+    cursor: grabbing !important;
+}
+
+.analytics-snapshot-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
 
 .analytics-snapshot-card--good {
-    background: #edf7ed;
-    border-color: #4caf50;
+    background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+    border-left: 4px solid #22c55e;
 }
 
 .analytics-snapshot-card--bad {
-    background: #fef2f2;
-    border-color: #ef4444;
+    background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+    border-left: 4px solid #ef4444;
 }
 
 .analytics-snapshot-card__title {
@@ -181,6 +214,23 @@
     color: #646970;
     font-size: 12px;
     line-height: 1.4;
+    display: flex;
+    flex-direction: column;
+}
+
+.analytics-card-goal {
+    display: inline-block;
+    background: rgba(34, 113, 177, 0.08);
+    color: #2271b1;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 8px;
+    width: fit-content;
+    border: 1px solid rgba(34, 113, 177, 0.15);
 }
 
 .analytics-snapshot-copy {
@@ -204,6 +254,7 @@
 /* Recent Events Table */
 .analytics-recent-events {
     overflow-x: auto;
+    margin-top: 18px;
 }
 
 .analytics-recent-events table {
@@ -269,4 +320,272 @@
 /* Button Styling */
 .analytics-config-status .button-primary {
     margin-top: 10px;
+}
+
+/* Tooltip (Info Bubble) */
+.analytics-info-bubble {
+    display: inline-block;
+    margin-left: 6px;
+    color: #8c8f94;
+    cursor: pointer;
+    position: relative;
+    vertical-align: text-bottom;
+}
+
+.analytics-info-bubble .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+.analytics-info-bubble:hover,
+.analytics-info-bubble:focus {
+    color: #2271b1;
+    outline: none;
+}
+
+.analytics-info-bubble[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 150%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #1d2327;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: normal;
+    text-transform: none;
+    line-height: 1.4;
+    white-space: normal;
+    width: 220px;
+    text-align: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+    pointer-events: none;
+    letter-spacing: normal;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+.analytics-info-bubble[data-tooltip]::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: #1d2327 transparent transparent transparent;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+    pointer-events: none;
+}
+
+.analytics-info-bubble:hover::after,
+.analytics-info-bubble:hover::before,
+.analytics-info-bubble:focus::after,
+.analytics-info-bubble:focus::before {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Card Menu Extra Actions */
+.analytics-snapshot-card {
+    position: relative;
+}
+
+.analytics-card-menu-container {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.analytics-card-menu {
+    cursor: pointer;
+    color: #8c8f94;
+    font-size: 18px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, color 0.2s;
+    background: transparent;
+}
+
+.analytics-card-menu:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1d2327;
+}
+
+.analytics-card-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: #fff;
+    border: 1px solid #dcdcde;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
+    z-index: 1000;
+    display: none;
+    min-width: 180px;
+    margin-top: 4px;
+    overflow: hidden;
+}
+
+.analytics-card-dropdown.show {
+    display: block;
+}
+
+.analytics-card-dropdown-item {
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #1d2327;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s;
+}
+
+.analytics-card-dropdown-item:hover {
+    background: #f0f0f1;
+}
+
+.analytics-card-dropdown-item .dashicons {
+    color: #646970;
+}
+
+/* Toast Notification */
+.analytics-toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: #111827;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.analytics-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.analytics-toast .dashicons {
+    color: #10b981;
+}
+
+.analytics-snapshot-card__pinned-indicator {
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    background: #fbbf24;
+    color: #fff;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 5;
+}
+
+.analytics-snapshot-card__pinned-indicator .dashicons {
+    font-size: 12px;
+    width: 12px;
+    height: 12px;
+}
+
+.analytics-snapshot-card--good .analytics-card-menu:hover {
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.analytics-snapshot-card--bad .analytics-card-menu:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Pagination Styles */
+.analytics-recent-events .tablenav.bottom {
+    margin-top: 20px;
+    height: auto;
+    display: block;
+    clear: both;
+}
+
+.analytics-recent-events .tablenav-pages {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    color: #646970;
+    float: none;
+    height: auto;
+}
+
+.analytics-recent-events .displaying-num {
+    font-size: 13px;
+    font-style: italic;
+    margin-right: 15px;
+    float: none;
+}
+
+.analytics-recent-events .tablenav-pages .pagination-links {
+    display: flex;
+    gap: 4px;
+    float: none;
+}
+
+.analytics-recent-events .tablenav-pages .pagination-links .page-numbers,
+.analytics-recent-events .tablenav-pages .pagination-links .tablenav-pages-navspan {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    text-decoration: none !important;
+    color: #2c3338;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    margin: 0 2px;
+}
+
+.analytics-recent-events .tablenav-pages .pagination-links a.page-numbers:hover {
+    background: #f6f7f7 !important;
+    border-color: #8c8f94 !important;
+    color: #2271b1 !important;
+}
+
+.analytics-recent-events .tablenav-pages .pagination-links .page-numbers.current {
+    background: #2271b1 !important;
+    border-color: #2271b1 !important;
+    color: #fff !important;
+}
+
+.analytics-recent-events .tablenav-pages .pagination-links .tablenav-pages-navspan {
+    background: #f0f0f1;
+    color: #a7aaad;
+    cursor: default;
 }

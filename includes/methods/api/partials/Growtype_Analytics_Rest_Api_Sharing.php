@@ -13,14 +13,22 @@ class Growtype_Analytics_Rest_Api_Sharing
     {
         add_action('rest_api_init', array($this, 'register_routes'));
 
-        // Bypass global REST locks (like Wordfence or "Force Login" plugins) for this specific endpoint
+        // Bypass global REST locks (like Wordfence or "Force Login" plugins) for specific endpoints
         add_filter('rest_authentication_errors', function($result) {
             $uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
             $route = isset($_GET['rest_route']) ? $_GET['rest_route'] : '';
             
-            if (strpos($uri, '/growtype-analytics/v1/shared-report/') !== false || strpos($route, '/growtype-analytics/v1/shared-report/') !== false) {
-                return true; // Overrides 401/403 errors and allows the request
+            $public_routes = array(
+                '/growtype-analytics/v1/shared-report/',
+                '/growtype-analytics/v1/track'
+            );
+
+            foreach ($public_routes as $public_route) {
+                if (strpos($uri, $public_route) !== false || strpos($route, $public_route) !== false) {
+                    return true; // Overrides 401/403 errors and allows the request
+                }
             }
+
             return $result;
         }, 100);
     }

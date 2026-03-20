@@ -72,9 +72,15 @@ class Growtype_Analytics_Admin
      *
      * @since    1.0.0
      */
-    public function enqueue_styles()
+    public function enqueue_styles($hook)
     {
+        // Only load styles on our plugin pages
+        if (strpos($hook, 'growtype-analytics') === false) {
+            return;
+        }
+
         wp_enqueue_style($this->growtype_analytics, GROWTYPE_ANALYTICS_URL . 'admin/css/growtype-analytics-admin.css', array (), $this->version, 'all');
+        wp_enqueue_style('growtype-analytics-page', GROWTYPE_ANALYTICS_URL . 'admin/css/growtype-analytics-page.css', array(), $this->version);
     }
 
     /**
@@ -82,9 +88,25 @@ class Growtype_Analytics_Admin
      *
      * @since    1.0.0
      */
-    public function enqueue_scripts()
+    public function enqueue_scripts($hook)
     {
-        wp_enqueue_script($this->growtype_analytics, GROWTYPE_ANALYTICS_URL . 'admin/js/growtype-analytics-admin.js', array ('jquery'), $this->version, false);
+        // Only load scripts on our plugin pages to prevent WP dashboard bloat
+        if (strpos($hook, 'growtype-analytics') === false) {
+            return;
+        }
+
+        wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js', array(), '3.9.1', true);
+        
+        wp_enqueue_script($this->growtype_analytics, GROWTYPE_ANALYTICS_URL . 'admin/js/growtype-analytics-admin.js', array('jquery', 'jquery-ui-sortable', 'chart-js'), $this->version, true);
+        wp_enqueue_script('growtype-analytics-ajax', GROWTYPE_ANALYTICS_URL . 'admin/js/growtype-analytics-ajax.js', array('jquery'), $this->version, true);
+
+        $vars = array(
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('growtype_analytics_nonce')
+        );
+
+        wp_localize_script($this->growtype_analytics, 'growtype_analytics_vars', $vars);
+        wp_localize_script('growtype-analytics-ajax', 'growtype_analytics_vars', $vars);
     }
 
     /**

@@ -67,6 +67,11 @@ class Growtype_Analytics_Rest_Api
     private $sharing_api;
 
     /**
+     * @var Growtype_Analytics_Rest_Api_Tracking
+     */
+    private $tracking_api;
+
+    /**
      * Initialize the class and set its properties.
      */
     public function __construct()
@@ -74,6 +79,9 @@ class Growtype_Analytics_Rest_Api
         // Force load sharing_api because it contains a global filter for 'rest_authentication_errors'
         // needed to bypass sitewide locks on the shared report endpoint.
         $this->get_sharing_api();
+
+        // Force load tracking_api early so the /track route is always available
+        $this->get_tracking_api();
 
         // Register other routes on demand
         add_action('rest_api_init', array($this, 'register_remaining_routes'));
@@ -179,5 +187,13 @@ class Growtype_Analytics_Rest_Api
             $this->sharing_api = new Growtype_Analytics_Rest_Api_Sharing();
         }
         return $this->sharing_api;
+    }
+
+    public function get_tracking_api() {
+        if (!$this->tracking_api) {
+            require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/api/partials/Growtype_Analytics_Rest_Api_Tracking.php';
+            $this->tracking_api = new Growtype_Analytics_Rest_Api_Tracking();
+        }
+        return $this->tracking_api;
     }
 }

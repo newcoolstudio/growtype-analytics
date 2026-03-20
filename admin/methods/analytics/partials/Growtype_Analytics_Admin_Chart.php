@@ -51,6 +51,11 @@ class Growtype_Analytics_Admin_Chart
     {
         check_ajax_referer('growtype_analytics_nonce', 'nonce');
 
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Unauthorized', 403);
+            return;
+        }
+
         $period = isset($_POST['period']) ? sanitize_text_field($_POST['period']) : 'week';
         $days = ($period === 'month') ? 30 : 7;
 
@@ -61,7 +66,7 @@ class Growtype_Analytics_Admin_Chart
             $debug = array();
             
             // Try getting data from PostHog first
-            $data = $this->controller->metrics->get_posthog_unique_users_data($days);
+            $data = $this->controller->posthog->get_unique_users_trend($days);
 
             // Fallback to local DB if PostHog data is not available
             $source = 'PostHog';
