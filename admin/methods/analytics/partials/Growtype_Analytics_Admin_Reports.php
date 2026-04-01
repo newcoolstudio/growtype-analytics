@@ -40,4 +40,10 @@ class Growtype_Analytics_Admin_Reports
         $page = $this->controller->get_page_by_class('Growtype_Analytics_Admin_Page_Buyer_Cohorts');
         return $page ? $page->get_buyer_cohort_rows($months) : array();
     }
+
+    public function get_top_characters_by_revenue_data($days = 30, $limit = 10, $offset = 0, $orderby = 'revenue', $order = 'desc')
+    {
+        $page = $this->controller->get_page_by_class('Growtype_Child_Growtype_Analytics_Admin_Page_Characters');
+        return $page ? $page->get_top_characters_by_revenue_data($days, $limit, $offset, $orderby, $order) : array();
+    }
 }
