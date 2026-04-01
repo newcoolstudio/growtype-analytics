@@ -76,19 +76,8 @@ class Growtype_Analytics_Rest_Api
      */
     public function __construct()
     {
-        // Force load sharing_api because it contains a global filter for 'rest_authentication_errors'
-        // needed to bypass sitewide locks on the shared report endpoint.
         $this->get_sharing_api();
-
-        // Force load tracking_api early so the /track route is always available
         $this->get_tracking_api();
-
-        // Register other routes on demand
-        add_action('rest_api_init', array($this, 'register_remaining_routes'));
-    }
-
-    public function register_remaining_routes()
-    {
         $this->get_user_api();
         $this->get_woocommerce_api();
         $this->get_docs_api();
