@@ -67,4 +67,8 @@ trait Growtype_Analytics_Admin_Page_Metrics_Trait
         return $this->metrics->get_growth_trends_data($days);
     }
 
+    public function get_registered_users_list_data($days, $paged = 1, $per_page = 50)
+    {
+        return $this->metrics->get_registered_users_list($days, $paged, $per_page);
+    }
 }

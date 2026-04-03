@@ -287,6 +287,91 @@ class Growtype_Analytics_Admin_Decision_Renderer
         <?php
     }
 
+    public function render_registered_users_table($date_from, $date_to)
+    {
+        $days = $this->page->metrics->get_period_days_count($date_from . ' - ' . $date_to);
+        $paged = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+        $per_page = 10;
+
+        $results = $this->page->get_registered_users_list_data($days, $paged, $per_page);
+        $users = $results['items'];
+        $total_items = $results['total_items'];
+
+        ?>
+        <div class="analytics-section" style="margin-top:24px;">
+            <h2><?php _e('Registered Users', 'growtype-analytics'); ?></h2>
+            <p class="description"><?php printf(__('Total registered users found for this period: %s', 'growtype-analytics'), number_format_i18n($total_items)); ?></p>
+
+            <?php
+            $headers = array (
+                __('ID', 'growtype-analytics'),
+                __('Email', 'growtype-analytics'),
+                __('Registered', 'growtype-analytics'),
+                __('Paid Orders', 'growtype-analytics'),
+                __('Messages', 'growtype-analytics'),
+                __('Regular Chat Visits', 'growtype-analytics'),
+                __('Roleplay Chat Visits', 'growtype-analytics'),
+                __('Roleplays Created', 'growtype-analytics'),
+                __('Quiz Solved', 'growtype-analytics'),
+                __('Offer Shown', 'growtype-analytics'),
+                __('Checkout Page', 'growtype-analytics'),
+                __('Credits Page', 'growtype-analytics'),
+                __('Subscription Modal Shown', 'growtype-analytics'),
+                __('Character Profile Visits', 'growtype-analytics'),
+                __('Roleplay Profile Visits', 'growtype-analytics'),
+                __('Chat Credits', 'growtype-analytics'),
+                __('Actions', 'growtype-analytics')
+            );
+
+            $yes = '<span style="color:#00a32a;font-weight:700;" title="Yes">&#10003;</span>';
+            $no  = '<span style="color:#d63638;font-weight:700;" title="No">&#10007;</span>';
+
+            $rows = array ();
+            foreach ($users ?: array () as $user) {
+                $analytics_url = add_query_arg(
+                    array (
+                        'page'    => 'user-analytics',
+                        'user_id' => $user['ID']
+                    ),
+                    admin_url('users.php')
+                );
+
+                $profile_url = add_query_arg(
+                    array ('user_id' => $user['ID']),
+                    admin_url('user-edit.php')
+                );
+
+                $rows[] = array (
+                    $user['ID'],
+                    esc_html($user['user_email']),
+                    esc_html(wp_date(get_option('date_format') . ' H:i', strtotime($user['user_registered']))),
+                    esc_html($user['paid_orders']),
+                    esc_html($user['message_count']),
+                    (int)($user['regular_chat_visits'] ?? 0),
+                    (int)($user['roleplay_chat_visits'] ?? 0),
+                    (int)($user['roleplay_visited'] ?? 0),
+                    (int)($user['quizzes_solved'] ?? 0),
+                    (int)($user['payment_form_shown'] ?? 0),
+                    (int)($user['checkout_visited'] ?? 0),
+                    (int)($user['credits_page_visited'] ?? 0),
+                    (int)($user['subscription_modal_shown'] ?? 0),
+                    (int)($user['character_profile_visits'] ?? 0),
+                    (int)($user['roleplay_profile_visits'] ?? 0),
+                    (int)($user['chat_credits_amount'] ?? 0),
+                    sprintf(
+                        '<a href="%s" class="button button-small" target="_blank">%s</a> <a href="%s" class="button button-small" target="_blank">%s</a>',
+                        esc_url($analytics_url), __('View Analytics', 'growtype-analytics'),
+                        esc_url($profile_url), __('Profile', 'growtype-analytics')
+                    )
+                );
+            }
+
+            $this->page->table_renderer->render($headers, $rows, $total_items, $per_page, $paged);
+            ?>
+        </div>
+        <?php
+    }
+
     private function get_kpi_meta_map($metrics, $pd)
     {
         $growth_sign_revenue = ($metrics['revenue_growth_mom'] ?? 0) >= 0 ? '+' : '';

@@ -60,6 +60,9 @@ class Growtype_Analytics_Tracking
 
         include_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/tracking/services/Growtype_Analytics_Tracking_Wc.php';
         new Growtype_Analytics_Tracking_Wc();
+
+        include_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/tracking/system/Growtype_Analytics_Tracking_Pages.php';
+        new Growtype_Analytics_Tracking_System_Pages();
     }
 
     function wp_footer_extend()

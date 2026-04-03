@@ -315,6 +315,126 @@ class Growtype_Analytics_Admin_Metrics
         return $metrics;
     }
 
+    public function get_registered_users_list($days, $paged = 1, $per_page = 50)
+    {
+        global $wpdb;
+        $settings = $this->get_snapshot_settings();
+        $email_exclusion = $this->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
+        $period_sql = $this->build_period_sql('u.user_registered', $days);
+
+        $offset = ($paged - 1) * $per_page;
+        $paid_statuses = $settings['paid_statuses'];
+        $paid_placeholders = implode(',', array_fill(0, count($paid_statuses), '%s'));
+
+        $chat_users_table    = $wpdb->prefix . 'growtype_chat_users';
+        $chat_messages_table = $wpdb->prefix . 'growtype_chat_messages';
+        $chat_sessions_table = $wpdb->prefix . 'growtype_chat_sessions';
+        $chat_us_table       = $wpdb->prefix . 'growtype_chat_user_session';
+        $quiz_results_table  = $wpdb->prefix . 'growtype_quiz_results';
+
+        $has_chat     = $this->controller->table_exists($chat_users_table) && $this->controller->table_exists($chat_messages_table);
+        $has_sessions = $this->controller->table_exists($chat_sessions_table) && $this->controller->table_exists($chat_us_table);
+        $has_quiz     = $this->controller->table_exists($quiz_results_table);
+
+        $chat_session_meta_table = $wpdb->prefix . 'growtype_chat_session_meta';
+        $has_session_meta = $this->controller->table_exists($chat_session_meta_table);
+
+        $analytics_tracking_table = $wpdb->prefix . 'growtype_analytics_tracking';
+        $has_analytics_tracking = $this->controller->table_exists($analytics_tracking_table);
+
+        // message_count: total messages sent by this user
+        $chat_select = $has_chat
+            ? ", (SELECT COUNT(m.id) FROM `{$chat_messages_table}` m INNER JOIN `{$chat_users_table}` cu ON cu.id = m.user_id WHERE cu.external_id = u.ID AND cu.type = 'wp_user') as message_count"
+            : ", 0 as message_count";
+
+        // regular_chat_visits: character_chat events tracked in analytics table
+        $regular_chat_visits_select = $has_analytics_tracking
+            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'character_chat') as regular_chat_visits"
+            : ", 0 as regular_chat_visits";
+
+        // roleplay_chat_visits: roleplay_chat events tracked in analytics table
+        $roleplay_chat_visits_select = $has_analytics_tracking
+            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'roleplay_chat') as roleplay_chat_visits"
+            : ", 0 as roleplay_chat_visits";
+
+        // roleplay_visited: count of 'roleplay' CPT posts created/authored by this user
+        $roleplay_visited_select = ", (SELECT COUNT(p.ID) FROM `{$wpdb->posts}` p WHERE p.post_author = u.ID AND p.post_type = 'roleplay' AND p.post_status = 'publish') as roleplay_visited";
+
+
+        // quizzes_solved: count of quizzes completed by this user
+        $quiz_visited_select = $has_quiz
+            ? ", (SELECT COUNT(qr.id) FROM `{$quiz_results_table}` qr WHERE qr.user_id = u.ID) as quizzes_solved"
+            : ", 0 as quizzes_solved";
+
+        // offer_shown: count of times an offer/paywall was shown to this user
+        $payment_form_shown_select = $has_analytics_tracking
+            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'offer_shown') as payment_form_shown"
+            : ", 0 as payment_form_shown";
+
+
+        // checkout_visited: count of /plans/ page visits tracked in the analytics table
+        $checkout_visited_select = $has_analytics_tracking
+            ? ", (SELECT COUNT(at.id) FROM `{$analytics_tracking_table}` at WHERE at.user_id = u.ID AND at.event_type = 'page_plans_visit') as checkout_visited"
+            : ", 0 as checkout_visited";
+
+        // credits_page_visited: count of /credits/ page visits tracked in the analytics table
+        $credits_page_visited_select = $has_analytics_tracking
+            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'page_credits_visit') as credits_page_visited"
+            : ", 0 as credits_page_visited";
+
+        // subscription_modal_shown: count of times the paywall modal was shown to this user
+        $subscription_modal_shown_select = $has_analytics_tracking
+            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'subscription_modal_shown') as subscription_modal_shown"
+            : ", 0 as subscription_modal_shown";
+
+        // character_profile_visits: count of character profile page visits
+        $character_profile_visits_select = $has_analytics_tracking
+            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'character_profile') as character_profile_visits"
+            : ", 0 as character_profile_visits";
+
+        // roleplay_profile_visits: count of roleplay profile page visits
+        $roleplay_profile_visits_select = $has_analytics_tracking
+            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'roleplay_profile') as roleplay_profile_visits"
+            : ", 0 as roleplay_profile_visits";
+
+        // chat_credits_amount: current credits balance stored in user meta
+        $chat_credits_select = ", COALESCE((SELECT CAST(um.meta_value AS SIGNED) FROM `{$wpdb->usermeta}` um WHERE um.user_id = u.ID AND um.meta_key = 'growtype_chat_credits' LIMIT 1), 0) as chat_credits_amount";
+
+        $query = "SELECT u.ID, u.user_email, u.display_name, u.user_registered,
+                (SELECT COUNT(p.ID) FROM {$wpdb->posts} p 
+                 INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID 
+                 WHERE pm.meta_key = '_customer_user' AND pm.meta_value = u.ID 
+                 AND p.post_type = 'shop_order' AND p.post_status IN ($paid_placeholders)) as paid_orders
+                {$chat_select}
+                {$regular_chat_visits_select}
+                {$roleplay_chat_visits_select}
+                {$roleplay_visited_select}
+                {$quiz_visited_select}
+                {$payment_form_shown_select}
+                {$checkout_visited_select}
+                {$credits_page_visited_select}
+                {$subscription_modal_shown_select}
+                {$character_profile_visits_select}
+                {$roleplay_profile_visits_select}
+                {$chat_credits_select}
+            FROM {$wpdb->users} u
+            WHERE 1=1 {$period_sql['sql']}
+            {$email_exclusion['sql']}
+            ORDER BY u.user_registered DESC
+            LIMIT %d, %d";
+
+        $params = array_merge($paid_statuses, $period_sql['params'], $email_exclusion['params'], array($offset, (int)$per_page));
+        $results = $wpdb->get_results($this->prepare_dynamic_query($query, $params), ARRAY_A);
+
+        $count_query = "SELECT COUNT(u.ID) FROM {$wpdb->users} u WHERE 1=1 {$period_sql['sql']} {$email_exclusion['sql']}";
+        $total_items = (int)$wpdb->get_var($this->prepare_dynamic_query($count_query, array_merge($period_sql['params'], $email_exclusion['params'])));
+
+        return array(
+            'items'       => $results,
+            'total_items' => $total_items
+        );
+    }
+
     public function get_new_buyers_count($days, $settings)
     {
         global $wpdb;

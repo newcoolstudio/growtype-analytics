@@ -204,13 +204,36 @@ class Growtype_Analytics_User_Chat
 
             // Display Session URLs
             $urls = [];
-            
-            // Character URL
-            // Character URL
-            if (!empty($settings)) {
-                if (!empty($character_slug)) {
-                     $character_url = home_url('/chat/' . $character_slug);
-                     $urls[] = '<a href="' . esc_url($character_url) . '" target="_blank">' . sprintf(__('Character Link (%s)', 'growtype-analytics'), $character_slug) . '</a>';
+
+            if (!empty($settings) && !empty($character_slug)) {
+                // 1. Character profile link
+                $character_url = home_url('/chat/' . $character_slug);
+                $urls[] = '<a href="' . esc_url($character_url) . '" target="_blank">'
+                    . sprintf(__('Character Link (%s)', 'growtype-analytics'), $character_slug)
+                    . '</a>';
+
+                // 2. Direct chat session link (opens the exact session)
+                if (class_exists('Growtype_Chat_Session')) {
+                    $session_token = Growtype_Chat_Session::get_token($session->id);
+                    if ($session_token) {
+                        $session_chat_url = home_url('/chat/' . $session_token);
+                        $urls[] = '<a href="' . esc_url($session_chat_url) . '" target="_blank">'
+                            . __('Chat Session Link', 'growtype-analytics')
+                            . '</a>';
+
+                        // 3. Admin impersonation link — opens session as the viewed user
+                        if (current_user_can('manage_options')) {
+                            $impersonate_url = add_query_arg(
+                                array('as_user_id' => $user_id),
+                                home_url('/chat/' . $session_token)
+                            );
+                            $urls[] = '<a href="' . esc_url($impersonate_url) . '" target="_blank" '
+                                . 'style="color:#d63638; font-weight:600;" '
+                                . 'title="' . esc_attr__('Opens this session as the user (admin only)', 'growtype-analytics') . '">'
+                                . '🔑 ' . __('View as User', 'growtype-analytics')
+                                . '</a>';
+                        }
+                    }
                 }
             }
 

@@ -120,7 +120,7 @@ class Growtype_Analytics_Database
     /**
      * Insert tracking record into database
      */
-    public static function track($event_type, $object_id = '', $object_type = '', $metadata = [])
+    public static function track($event_type, $object_id = '', $object_type = '', $metadata = [], $dedup_hours = 1)
     {
         $user_id = get_current_user_id() ?: 0;
 
@@ -130,11 +130,12 @@ class Growtype_Analytics_Database
         }
 
         $payload = array(
-            'event_type'  => $event_type,
-            'object_id'   => (string)$object_id,
-            'object_type' => (string)$object_type,
-            'metadata'    => $metadata,
-            'user_id'     => $user_id
+            'event_type'   => $event_type,
+            'object_id'    => (string)$object_id,
+            'object_type'  => (string)$object_type,
+            'metadata'     => $metadata,
+            'user_id'      => $user_id,
+            'dedup_hours'  => max(0, (int)$dedup_hours),
         );
 
         global $wp_object_cache;
@@ -163,25 +164,30 @@ class Growtype_Analytics_Database
         global $wpdb;
         $table_name = $wpdb->prefix . self::TABLE_NAME;
 
-        $user_id = isset($payload['user_id']) ? (int)$payload['user_id'] : 0;
-        $event_type = isset($payload['event_type']) ? $payload['event_type'] : '';
-        $object_id = isset($payload['object_id']) ? $payload['object_id'] : '';
-        $object_type = isset($payload['object_type']) ? $payload['object_type'] : '';
-        $metadata = isset($payload['metadata']) ? $payload['metadata'] : [];
+        $user_id     = isset($payload['user_id'])     ? (int)$payload['user_id']    : 0;
+        $event_type  = isset($payload['event_type'])  ? $payload['event_type']      : '';
+        $object_id   = isset($payload['object_id'])   ? $payload['object_id']       : '';
+        $object_type = isset($payload['object_type']) ? $payload['object_type']     : '';
+        $metadata    = isset($payload['metadata'])    ? $payload['metadata']        : [];
+        $dedup_hours = isset($payload['dedup_hours']) ? max(0, (int)$payload['dedup_hours']) : 1;
 
-        // Basic deduplication/throttling: No duplicate hits from same user within 1 hour
-        $exists = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM $table_name 
-             WHERE user_id = %d AND event_type = %s AND object_id = %s 
-             AND created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR) 
-             LIMIT 1",
-            $user_id,
-            $event_type,
-            (string)$object_id
-        ));
+        // Deduplication: skip if same user+event+object seen within the dedup window.
+        // dedup_hours = 0 disables the check entirely (track every occurrence).
+        if ($dedup_hours > 0) {
+            $exists = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM $table_name 
+                 WHERE user_id = %d AND event_type = %s AND object_id = %s 
+                 AND created_at >= DATE_SUB(NOW(), INTERVAL %d HOUR) 
+                 LIMIT 1",
+                $user_id,
+                $event_type,
+                (string)$object_id,
+                $dedup_hours
+            ));
 
-        if ($exists) {
-            return false;
+            if ($exists) {
+                return false;
+            }
         }
 
         $result = $wpdb->insert(

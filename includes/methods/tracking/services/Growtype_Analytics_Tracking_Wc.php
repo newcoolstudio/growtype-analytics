@@ -87,6 +87,46 @@ class Growtype_Analytics_Tracking_Wc
                 }
             }
         }, 10, 1);
+
+        add_action('wp_footer', [$this, 'track_subscription_modal']);
+    }
+
+    /**
+     * Output JS to track subscription/paywall modal impressions.
+     */
+    public function track_subscription_modal()
+    {
+        ?>
+        <script id="growtype-analytics-wc-modal-tracker">
+            (function () {
+                var modalEl = document.getElementById('growtypeWcSubscriptionModal');
+                if (!modalEl) return;
+
+                var REST_URL = '<?php echo esc_url_raw(rest_url('growtype-analytics/v1/track')); ?>';
+                var modalTracked = false;
+
+                modalEl.addEventListener('show.bs.modal', function () {
+                    if (modalTracked) return;
+                    modalTracked = true;
+                    setTimeout(function () { modalTracked = false; }, 3600000);
+
+                    var title = (modalEl.querySelector('.modal-title') || {}).innerText || '';
+                    if (typeof fetch === 'function') {
+                        fetch(REST_URL, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                event_type: 'subscription_modal_shown',
+                                object_id: 'subscription_modal',
+                                object_type: 'modal',
+                                metadata: {title: title}
+                            })
+                        }).catch(function () {});
+                    }
+                });
+            })();
+        </script>
+        <?php
     }
 
     public static function set_tracking_params()
