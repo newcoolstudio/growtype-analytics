@@ -228,7 +228,8 @@ class Growtype_Analytics_Database
         $results = $wpdb->get_results($wpdb->prepare(
             "SELECT object_id, 
                     COUNT(DISTINCT CASE WHEN event_type = 'character_profile' THEN user_id ELSE NULL END) as profiles,
-                    COUNT(DISTINCT CASE WHEN event_type = 'character_chat' THEN user_id ELSE NULL END) as chats
+                    COUNT(DISTINCT CASE WHEN event_type = 'character_chat' THEN user_id ELSE NULL END) as chats,
+                    MAX(created_at) as last_tracked_at
              FROM $table_name 
              WHERE object_type = 'character'
              AND created_at >= DATE_SUB(NOW(), INTERVAL %d DAY) 
@@ -239,8 +240,9 @@ class Growtype_Analytics_Database
         $stats = array();
         foreach ($results as $row) {
             $stats[$row['object_id']] = array(
-                'profiles' => (int)$row['profiles'],
-                'chats' => (int)$row['chats']
+                'profiles'        => (int)$row['profiles'],
+                'chats'           => (int)$row['chats'],
+                'last_tracked_at' => $row['last_tracked_at'] ?? '',
             );
         }
 
