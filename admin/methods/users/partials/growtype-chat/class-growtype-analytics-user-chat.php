@@ -105,6 +105,8 @@ class Growtype_Analytics_User_Chat
             return '<div class="empty-state">No chat sessions found</div>';
         }
 
+        $export_data = []; // Will collect structured data for JSON export
+
         $html = '<div class="chat-sessions-list">';
 
         // Batch fetching for optimization
@@ -130,6 +132,8 @@ class Growtype_Analytics_User_Chat
         }
 
         foreach ($sessions as $session) {
+            $session_export = []; // Export data for this session
+
             // Use batched messages
             $messages = $all_messages[$session->id] ?? [];
 
@@ -171,19 +175,37 @@ class Growtype_Analytics_User_Chat
                     }
                 }
 
+            // Build export data for this session
+            $session_export = [
+                'session_id'      => $session->id,
+                'created_at'      => $session->created_at,
+                'user_messages'   => count($user_messages),
+                'bot_responses'   => count($bot_messages),
+                'total_messages'  => $message_count,
+                'settings'        => $settings,
+                'messages'        => [],
+            ];
+
             $html .= '<div class="chat-session-item">';
             $html .= '<div class="session-header">';
             $html .= $bot_image_html;
-            $html .= '<div class="session-info">';
+            $html .= '<div class="session-info" style="width:60%;">';
             $html .= '<div class="session-title">';
             $html .= '<strong>Session #' . esc_html($session->id) . '</strong>';
             if (!empty($session->bot_profile)) {
                 $html .= ' <span class="bot-badge">' . esc_html($session->bot_profile) . '</span>';
             }
             $html .= '</div>';
+            $roleplay_scenario = $settings['roleplay_scenario'] ?? 'none';
+            $is_roleplay       = !empty($roleplay_scenario) && $roleplay_scenario !== 'none';
+            $chat_type_label   = $is_roleplay
+                ? '<span style="display:inline-block; background:#f0e6ff; color:#6a0dad; border-radius:4px; padding:1px 7px; font-size:0.85em; font-weight:600;">🎭 Roleplay</span>'
+                : '<span style="display:inline-block; background:#e6f4ff; color:#0066cc; border-radius:4px; padding:1px 7px; font-size:0.85em; font-weight:600;">💬 Regular Chat</span>';
+
             $html .= '<div class="session-meta">';
             $html .= esc_html(date('M j, Y g:i A', $created_time)) . ' (' . esc_html($time_ago) . ')';
             $html .= ' • ' . count($user_messages) . ' user messages • ' . count($bot_messages) . ' bot responses';
+            $html .= ' • ' . $chat_type_label;
             $html .= '</div>';
 
             // Display Session Meta/Settings
@@ -242,7 +264,11 @@ class Growtype_Analytics_User_Chat
             }
 
             $html .= '</div>';
+            $html .= '<div class="session-actions" style="display:flex; gap:6px; margin-top:8px;">';
             $html .= '<button class="toggle-messages button" data-session="' . esc_attr($session->id) . '">Show Messages (' . $message_count . ')</button>';
+            $html .= '<button class="export-session button button-secondary" data-session="' . esc_attr($session->id) . '" title="Export this session as JSON">⬇ Export</button>';
+            $html .= '<button class="copy-session button button-secondary" data-session="' . esc_attr($session->id) . '" title="Copy session JSON to clipboard">📋 Copy</button>';
+            $html .= '</div>';
             $html .= '</div>';
 
             // Messages container (hidden by default)
@@ -264,9 +290,11 @@ class Growtype_Analytics_User_Chat
                     // Decode/Decrypt message content
                     $content = $message->content;
                     $rendered_message = '';
+                    $decoded_for_export = null;
                     
                     if (class_exists('Growtype_Chat_Message')) {
                         $decoded = Growtype_Chat_Message::decode_content($content);
+                        $decoded_for_export = $decoded;
                         
                         if (is_array($decoded)) {
                             // Render Main Text
@@ -321,10 +349,19 @@ class Growtype_Analytics_User_Chat
                             }
                         } else {
                             $rendered_message = wp_kses_post($decoded);
+                            $decoded_for_export = $decoded;
                         }
                     } else {
                         $rendered_message = wp_kses_post($content);
+                        $decoded_for_export = $content;
                     }
+
+                    // Collect message for export
+                    $session_export['messages'][] = [
+                        'role'       => $is_user ? 'user' : 'bot',
+                        'content'    => $decoded_for_export,
+                        'created_at' => $message->created_at,
+                    ];
                     
                     $html .= '<div class="message-content">' . $rendered_message . '</div>';
                     $html .= '<div class="message-time">' . esc_html(date('g:i A', strtotime($message->created_at))) . '</div>';
@@ -334,12 +371,17 @@ class Growtype_Analytics_User_Chat
             
             $html .= '</div>';
             $html .= '</div>';
+
+            $export_data[] = $session_export;
         }
 
         $html .= '</div>';
 
-        // Add JavaScript for toggle functionality
+        // Embed export data and add JavaScript for toggle + export
+        $export_json = wp_json_encode($export_data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         $html .= '<script>
+        var growtypeSessionsExportData = ' . $export_json . ';
+
         jQuery(document).ready(function($) {
             $(".toggle-messages").on("click", function() {
                 var sessionId = $(this).data("session");
@@ -352,6 +394,61 @@ class Growtype_Analytics_User_Chat
                     messagesDiv.slideDown();
                     $(this).text("Hide Messages");
                 }
+            });
+
+            $("#growtype-export-sessions-btn").on("click", function() {
+                var json = JSON.stringify(growtypeSessionsExportData, null, 2);
+                var blob = new Blob([json], {type: "application/json"});
+                var url  = URL.createObjectURL(blob);
+                var a    = document.createElement("a");
+                a.href     = url;
+                a.download = "chat-sessions-export.json";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            $(".export-session").on("click", function() {
+                var sessionId = parseInt($(this).data("session"), 10);
+                var sessionData = growtypeSessionsExportData.find(function(s) { return parseInt(s.session_id, 10) === sessionId; });
+                if (!sessionData) return;
+                var json = JSON.stringify(sessionData, null, 2);
+                var blob = new Blob([json], {type: "application/json"});
+                var url  = URL.createObjectURL(blob);
+                var a    = document.createElement("a");
+                a.href     = url;
+                a.download = "session-" + sessionId + "-export.json";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            $(".copy-session").on("click", function() {
+                var $btn = $(this);
+                var sessionId = parseInt($btn.data("session"), 10);
+                var sessionData = growtypeSessionsExportData.find(function(s) { return parseInt(s.session_id, 10) === sessionId; });
+                if (!sessionData) return;
+                var json = JSON.stringify(sessionData, null, 2);
+                navigator.clipboard.writeText(json).then(function() {
+                    var original = $btn.text();
+                    $btn.text("\u2713 Copied!");
+                    setTimeout(function() { $btn.text(original); }, 2000);
+                }).catch(function() {
+                    // Fallback for older browsers
+                    var ta = document.createElement("textarea");
+                    ta.value = json;
+                    ta.style.position = "fixed";
+                    ta.style.opacity  = "0";
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(ta);
+                    var original = $btn.text();
+                    $btn.text("\u2713 Copied!");
+                    setTimeout(function() { $btn.text(original); }, 2000);
+                });
             });
         });
         </script>';
@@ -438,7 +535,12 @@ class Growtype_Analytics_User_Chat
                 </div>
 
                 <div class="analytics-card chat-sessions" style="grid-column: 1 / -1;">
-                    <h3><?php _e('Chat Sessions', 'growtype-analytics'); ?></h3>
+                    <h3 style="display:flex; align-items:center; gap:10px;">
+                        <?php _e('Chat Sessions', 'growtype-analytics'); ?>
+                        <button id="growtype-export-sessions-btn" class="button button-secondary" style="font-size:0.85em; padding:2px 10px; margin-left:auto;">
+                            ⬇ <?php _e('Export JSON', 'growtype-analytics'); ?>
+                        </button>
+                    </h3>
                     <div id="chat-sessions-data">
                         <?php echo $this->render_user_sessions($user_id); ?>
                     </div>

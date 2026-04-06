@@ -51,54 +51,113 @@ class Growtype_Analytics_Admin_Decision_Renderer
 
     public function render_period_filter($date_from, $date_to, $page_name = 'growtype-analytics')
     {
+        // Both active filters and available filters come from the single registry.
+        $active_filters    = Growtype_Analytics_Admin_User_Filters::active_from_request();
+        $available_filters = Growtype_Analytics_Admin_User_Filters::registry();
         ?>
-        <div class="analytics-filter-toolbar" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-            <div class="analytics-period-shortcuts" style="display: flex; gap: 6px;">
+        <?php /* ── Row 1: Period controls ── */ ?>
+        <div class="analytics-filter-toolbar" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div style="display:flex; gap:6px;">
                 <button type="button" class="button" onclick="setAnalyticsPeriod(1)"><?php _e('Last 24h', 'growtype-analytics'); ?></button>
                 <button type="button" class="button" onclick="setAnalyticsPeriod(7)"><?php _e('Last 7d', 'growtype-analytics'); ?></button>
                 <button type="button" class="button" onclick="setAnalyticsPeriod(30)"><?php _e('Last 30d', 'growtype-analytics'); ?></button>
             </div>
 
-            <form id="analytics-period-form" method="GET" action="<?php echo esc_url(admin_url('admin.php')); ?>" style="display: inline-flex; gap: 10px; align-items: center;">
-                <input type="hidden" name="page" value="<?php echo esc_attr($page_name); ?>">
+            <form id="analytics-period-form" method="GET" action="<?php echo esc_url(admin_url('admin.php')); ?>"
+                  style="display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <input type="hidden" name="page"    value="<?php echo esc_attr($page_name); ?>">
                 <input type="hidden" name="refresh" value="1">
+                <?php foreach ($active_filters as $af): ?>
+                    <input type="hidden" name="user_filters[]" value="<?php echo esc_attr($af); ?>">
+                <?php endforeach; ?>
 
-                <span style="font-weight: 500; font-size: 13px; color: #50575e;"><?php _e('Or custom:', 'growtype-analytics'); ?></span>
-                <input type="date" id="date_from" name="date_from" value="<?php echo esc_attr($date_from); ?>" class="regular-text" style="width: auto; height: 32px; padding: 0 8px;">
-                <span style="color: #8c8f94;">&rarr;</span>
-                <input type="date" id="date_to" name="date_to" value="<?php echo esc_attr($date_to); ?>" class="regular-text" style="width: auto; height: 32px; padding: 0 8px;">
-
-                <button type="submit" class="button button-primary" style="display: inline-flex; align-items: center; gap: 6px; height: 32px;">
-                    <span class="dashicons dashicons-image-rotate" style="font-size: 16px; width: 16px; height: 16px;"></span>
-                    <?php _e('Apply & Refresh', 'growtype-analytics'); ?>
+                <span style="font-weight:500; font-size:13px; color:#50575e;"><?php _e('Or custom:', 'growtype-analytics'); ?></span>
+                <input type="date" id="date_from" name="date_from" value="<?php echo esc_attr($date_from); ?>"
+                       style="width:auto; height:32px; padding:0 8px; border-radius:6px; border:1px solid #dcdcde;">
+                <span style="color:#8c8f94;">&rarr;</span>
+                <input type="date" id="date_to" name="date_to" value="<?php echo esc_attr($date_to); ?>"
+                       style="width:auto; height:32px; padding:0 8px; border-radius:6px; border:1px solid #dcdcde;">
+                <button type="submit" class="button button-primary" style="display:inline-flex; align-items:center; gap:5px; height:32px;">
+                    <span class="dashicons dashicons-image-rotate" style="font-size:15px; width:15px; height:15px;"></span>
+                    <?php _e('Apply', 'growtype-analytics'); ?>
                 </button>
             </form>
-
-            <script>
-                function setAnalyticsPeriod(days) {
-                    const to = new Date();
-                    const from = new Date();
-                    from.setDate(to.getDate() - (days - 1));
-
-                    const offset = to.getTimezoneOffset() * 60000;
-                    const fromStr = new Date(from - offset).toISOString().split('T')[0];
-                    const toStr = new Date(to - offset).toISOString().split('T')[0];
-
-                    document.getElementById('date_from').value = fromStr;
-                    document.getElementById('date_to').value = toStr;
-                    document.getElementById('analytics-period-form').submit();
-                }
-
-                // Remove refresh=1 from URL after page load to prevent accidental re-refreshing
-                if (window.history.replaceState && window.location.search.indexOf('refresh=1') !== -1) {
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete('refresh');
-                    window.history.replaceState({}, '', url.toString());
-                }
-            </script>
         </div>
+
+
+        <?php /* ── Row 2: Filter pills (opt-in pages only) ── */ ?>
+        <?php if (in_array($page_name, Growtype_Analytics_Admin_User_Filters::FILTER_PAGES, true) && !empty($available_filters)): ?>
+        <form id="analytics-filters-form" method="GET" action="<?php echo esc_url(admin_url('admin.php')); ?>"
+              style="margin-top:10px; padding-top:10px; border-top:1px solid #f0f0f1;"
+              onchange="this.submit()">
+            <input type="hidden" name="page"      value="<?php echo esc_attr($page_name); ?>">
+            <input type="hidden" name="refresh"   value="1">
+            <input type="hidden" name="date_from" value="<?php echo esc_attr($date_from); ?>">
+            <input type="hidden" name="date_to"   value="<?php echo esc_attr($date_to); ?>">
+
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:#646970; letter-spacing:0.06em; white-space:nowrap;">
+                    <?php _e('Filter by', 'growtype-analytics'); ?>
+                </span>
+
+                <?php foreach ($available_filters as $key => $f):
+                    $active = in_array($key, $active_filters, true);
+                    $c      = $f['color'];
+                ?>
+                    <label style="
+                            display:inline-flex; align-items:center; gap:5px;
+                            background:<?php echo $active ? $c : 'transparent'; ?>;
+                            color:<?php echo $active ? '#fff' : $c; ?>;
+                            border:1.5px solid <?php echo $c; ?>;
+                            border-radius:999px; padding:3px 13px;
+                            font-size:12px; font-weight:600;
+                            cursor:pointer; user-select:none; white-space:nowrap;
+                            transition:background .12s, color .12s;
+                        "
+                        onmouseover="if(!this.querySelector('input').checked){ this.style.background='<?php echo $c; ?>22'; }"
+                        onmouseout="if(!this.querySelector('input').checked){ this.style.background='transparent'; }"
+                    >
+                        <input type="checkbox" name="user_filters[]" value="<?php echo esc_attr($key); ?>"
+                               <?php checked($active); ?>
+                               style="position:absolute; opacity:0; width:0; height:0;">
+                        <?php echo esc_html($f['icon'] . ' ' . $f['label']); ?>
+                        <?php if ($active): ?><span style="margin-left:2px; opacity:.75; font-size:10px;">✕</span><?php endif; ?>
+                    </label>
+                <?php endforeach; ?>
+
+                <?php if (!empty($active_filters)): ?>
+                    <a href="<?php echo esc_url(add_query_arg([
+                            'page'      => $page_name,
+                            'date_from' => $date_from,
+                            'date_to'   => $date_to,
+                        ], admin_url('admin.php'))); ?>"
+                       style="font-size:12px; color:#646970; text-decoration:none; opacity:.75; margin-left:4px;">
+                        <?php _e('✕ Clear filters', 'growtype-analytics'); ?>
+                    </a>
+                <?php endif; ?>
+            </div>
+        </form>
+        <?php endif; ?>
+
+
+        <script>
+            function setAnalyticsPeriod(days) {
+                const to = new Date(), from = new Date();
+                from.setDate(to.getDate() - (days - 1));
+                const offset = to.getTimezoneOffset() * 60000;
+                document.getElementById('date_from').value = new Date(from - offset).toISOString().split('T')[0];
+                document.getElementById('date_to').value   = new Date(to   - offset).toISOString().split('T')[0];
+                document.getElementById('analytics-period-form').submit();
+            }
+            if (window.history.replaceState && window.location.search.indexOf('refresh=1') !== -1) {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('refresh');
+                window.history.replaceState({}, '', url.toString());
+            }
+        </script>
         <?php
     }
+
 
     public function render_analytics_snapshot($metrics = null)
     {
@@ -292,15 +351,25 @@ class Growtype_Analytics_Admin_Decision_Renderer
         $days = $this->page->metrics->get_period_days_count($date_from . ' - ' . $date_to);
         $paged = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
         $per_page = 10;
+        $active_filters = Growtype_Analytics_Admin_User_Filters::active_from_request();
 
-        $results = $this->page->get_registered_users_list_data($days, $paged, $per_page);
+        $results = $this->page->get_registered_users_list_data($days, $paged, $per_page, $active_filters);
         $users = $results['items'];
         $total_items = $results['total_items'];
 
         ?>
         <div class="analytics-section" style="margin-top:24px;">
             <h2><?php _e('Registered Users', 'growtype-analytics'); ?></h2>
-            <p class="description"><?php printf(__('Total registered users found for this period: %s', 'growtype-analytics'), number_format_i18n($total_items)); ?></p>
+            <p class="description">
+                <?php printf(__('Total registered users found for this period: %s', 'growtype-analytics'), number_format_i18n($total_items)); ?>
+                <?php
+                $registry = Growtype_Analytics_Admin_User_Filters::registry();
+                foreach ($active_filters as $f) {
+                    $label = isset($registry[$f]) ? ($registry[$f]['icon'] . ' ' . $registry[$f]['label']) : ucwords(str_replace('_', ' ', $f));
+                    echo '<span style="display:inline-block; background:#fff3cd; color:#856404; border-radius:4px; padding:1px 8px; font-size:0.85em; font-weight:600; margin-left:6px;">' . esc_html($label) . ' Active</span>';
+                }
+                ?>
+            </p>
 
             <?php
             $headers = array (

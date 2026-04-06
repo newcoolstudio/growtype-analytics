@@ -94,6 +94,7 @@ class Growtype_Analytics_Admin_Page
     {
         switch ($name) {
             case 'decision_renderer':
+                require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_User_Filters.php';
                 require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Decision_Renderer.php';
                 $this->decision_renderer = new Growtype_Analytics_Admin_Decision_Renderer($this);
                 return $this->decision_renderer;
@@ -126,6 +127,9 @@ class Growtype_Analytics_Admin_Page
                 $this->funnel = new Growtype_Analytics_Admin_Funnel($this);
                 return $this->funnel;
             case 'metrics':
+                if (!class_exists('Growtype_Analytics_Admin_User_Filters')) {
+                    require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_User_Filters.php';
+                }
                 require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Metrics.php';
                 $this->metrics = new Growtype_Analytics_Admin_Metrics($this);
                 return $this->metrics;
