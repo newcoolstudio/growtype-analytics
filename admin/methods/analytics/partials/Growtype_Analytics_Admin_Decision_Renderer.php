@@ -357,6 +357,7 @@ class Growtype_Analytics_Admin_Decision_Renderer
         $users = $results['items'];
         $total_items = $results['total_items'];
 
+        $bulk_nonce = wp_create_nonce('growtype_analytics_bulk_actions');
         ?>
         <div class="analytics-section" style="margin-top:24px;">
             <h2><?php _e('Registered Users', 'growtype-analytics'); ?></h2>
@@ -371,73 +372,219 @@ class Growtype_Analytics_Admin_Decision_Renderer
                 ?>
             </p>
 
-            <?php
-            $headers = array (
-                __('ID', 'growtype-analytics'),
-                __('Email', 'growtype-analytics'),
-                __('Registered', 'growtype-analytics'),
-                __('Paid Orders', 'growtype-analytics'),
-                __('Messages', 'growtype-analytics'),
-                __('Regular Chat Visits', 'growtype-analytics'),
-                __('Roleplay Chat Visits', 'growtype-analytics'),
-                __('Roleplays Created', 'growtype-analytics'),
-                __('Quiz Solved', 'growtype-analytics'),
-                __('Offer Shown', 'growtype-analytics'),
-                __('Checkout Page', 'growtype-analytics'),
-                __('Credits Page', 'growtype-analytics'),
-                __('Subscription Modal Shown', 'growtype-analytics'),
-                __('Character Profile Visits', 'growtype-analytics'),
-                __('Roleplay Profile Visits', 'growtype-analytics'),
-                __('Chat Credits', 'growtype-analytics'),
-                __('Actions', 'growtype-analytics')
-            );
+            <?php /* ── Bulk action bar ── */ ?>
+            <div id="ga-bulk-bar" style="
+                display:none;
+                align-items:center; gap:10px; flex-wrap:wrap;
+                background:#f0f6fc; border:1px solid #c8d7e8;
+                border-radius:8px; padding:10px 16px; margin-bottom:12px;
+            ">
+                <span id="ga-bulk-count" style="font-weight:600; font-size:13px; color:#2271b1;"></span>
+                
+                <select id="ga-bulk-action-select" style="height:30px; line-height:1; padding:0 10px; border-radius:4px;">
+                    <option value="none"><?php _e('Bulk Actions', 'growtype-analytics'); ?></option>
+                    <option value="export_conversations"><?php _e('Export Conversations', 'growtype-analytics'); ?></option>
+                </select>
 
-            $yes = '<span style="color:#00a32a;font-weight:700;" title="Yes">&#10003;</span>';
-            $no  = '<span style="color:#d63638;font-weight:700;" title="No">&#10007;</span>';
+                <button type="button" id="ga-bulk-submit-btn" class="button button-secondary">
+                    <?php _e('Apply', 'growtype-analytics'); ?>
+                </button>
+                
+                <span id="ga-bulk-status" style="font-size:12px; color:#646970;"></span>
+            </div>
 
-            $rows = array ();
-            foreach ($users ?: array () as $user) {
-                $analytics_url = add_query_arg(
-                    array (
-                        'page'    => 'user-analytics',
-                        'user_id' => $user['ID']
-                    ),
-                    admin_url('users.php')
-                );
+            <?php /* ── Table ── */ ?>
+            <div class="analytics-recent-events">
+                <table class="wp-list-table widefat striped">
+                    <thead>
+                    <tr>
+                        <th style="width:32px;">
+                            <input type="checkbox" id="ga-select-all" title="<?php esc_attr_e('Select all on this page', 'growtype-analytics'); ?>">
+                        </th>
+                        <th><?php _e('ID', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Email', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Registered', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Paid Orders', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Messages', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Regular Chat Visits', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Roleplay Chat Visits', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Roleplays Created', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Quiz Solved', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Offer Shown', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Checkout Page', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Credits Page', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Subscription Modal Shown', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Character Profile Visits', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Roleplay Profile Visits', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Chat Credits', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Actions', 'growtype-analytics'); ?></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (empty($users)): ?>
+                        <tr>
+                            <td colspan="18"><?php _e('No data available for this view yet.', 'growtype-analytics'); ?></td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($users as $user):
+                            $analytics_url = add_query_arg(
+                                ['page' => 'user-analytics', 'user_id' => $user['ID']],
+                                admin_url('users.php')
+                            );
+                            $profile_url = add_query_arg(
+                                ['user_id' => $user['ID']],
+                                admin_url('user-edit.php')
+                            );
+                        ?>
+                            <tr>
+                                <td>
+                                    <input type="checkbox" class="ga-user-checkbox" value="<?php echo esc_attr($user['ID']); ?>">
+                                </td>
+                                <td><?php echo esc_html($user['ID']); ?></td>
+                                <td><?php echo esc_html($user['user_email']); ?></td>
+                                <td><?php echo esc_html(wp_date(get_option('date_format') . ' H:i', strtotime($user['user_registered']))); ?></td>
+                                <td><?php echo esc_html($user['paid_orders']); ?></td>
+                                <td><?php echo esc_html($user['message_count']); ?></td>
+                                <td><?php echo (int)($user['regular_chat_visits'] ?? 0); ?></td>
+                                <td><?php echo (int)($user['roleplay_chat_visits'] ?? 0); ?></td>
+                                <td><?php echo (int)($user['roleplay_visited'] ?? 0); ?></td>
+                                <td><?php echo (int)($user['quizzes_solved'] ?? 0); ?></td>
+                                <td><?php echo (int)($user['payment_form_shown'] ?? 0); ?></td>
+                                <td><?php echo (int)($user['checkout_visited'] ?? 0); ?></td>
+                                <td><?php echo (int)($user['credits_page_visited'] ?? 0); ?></td>
+                                <td><?php echo (int)($user['subscription_modal_shown'] ?? 0); ?></td>
+                                <td><?php echo (int)($user['character_profile_visits'] ?? 0); ?></td>
+                                <td><?php echo (int)($user['roleplay_profile_visits'] ?? 0); ?></td>
+                                <td><?php echo (int)($user['chat_credits_amount'] ?? 0); ?></td>
+                                <td>
+                                    <a href="<?php echo esc_url($analytics_url); ?>" class="button button-small" target="_blank"><?php _e('View Analytics', 'growtype-analytics'); ?></a>
+                                    <a href="<?php echo esc_url($profile_url); ?>" class="button button-small" target="_blank"><?php _e('Profile', 'growtype-analytics'); ?></a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
 
-                $profile_url = add_query_arg(
-                    array ('user_id' => $user['ID']),
-                    admin_url('user-edit.php')
-                );
+                <?php /* Pagination */ ?>
+                <?php
+                $total_pages = ceil($total_items / $per_page);
+                if ($total_pages > 1):
+                    $base_url = $_SERVER['REQUEST_URI'] ?? admin_url('admin.php');
+                    $base = add_query_arg('paged', '%#%', remove_query_arg(['paged', 'refresh'], $base_url));
+                ?>
+                    <div class="tablenav bottom">
+                        <div class="tablenav-pages">
+                            <span class="displaying-num"><?php printf(_n('%s item', '%s items', $total_items, 'growtype-analytics'), number_format_i18n($total_items)); ?></span>
+                            <span class="pagination-links">
+                                <?php echo paginate_links([
+                                    'base'      => $base,
+                                    'format'    => '',
+                                    'prev_text' => __('&laquo;'),
+                                    'next_text' => __('&raquo;'),
+                                    'total'     => $total_pages,
+                                    'current'   => $paged,
+                                ]); ?>
+                            </span>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
 
-                $rows[] = array (
-                    $user['ID'],
-                    esc_html($user['user_email']),
-                    esc_html(wp_date(get_option('date_format') . ' H:i', strtotime($user['user_registered']))),
-                    esc_html($user['paid_orders']),
-                    esc_html($user['message_count']),
-                    (int)($user['regular_chat_visits'] ?? 0),
-                    (int)($user['roleplay_chat_visits'] ?? 0),
-                    (int)($user['roleplay_visited'] ?? 0),
-                    (int)($user['quizzes_solved'] ?? 0),
-                    (int)($user['payment_form_shown'] ?? 0),
-                    (int)($user['checkout_visited'] ?? 0),
-                    (int)($user['credits_page_visited'] ?? 0),
-                    (int)($user['subscription_modal_shown'] ?? 0),
-                    (int)($user['character_profile_visits'] ?? 0),
-                    (int)($user['roleplay_profile_visits'] ?? 0),
-                    (int)($user['chat_credits_amount'] ?? 0),
-                    sprintf(
-                        '<a href="%s" class="button button-small" target="_blank">%s</a> <a href="%s" class="button button-small" target="_blank">%s</a>',
-                        esc_url($analytics_url), __('View Analytics', 'growtype-analytics'),
-                        esc_url($profile_url), __('Profile', 'growtype-analytics')
-                    )
-                );
+        <script>
+        (function($) {
+            const nonce   = '<?php echo esc_js($bulk_nonce); ?>';
+            const ajaxUrl = '<?php echo esc_js(admin_url('admin-ajax.php')); ?>';
+
+            // ── Checkbox logic ──────────────────────────────────────────────
+            function getChecked() {
+                return $('.ga-user-checkbox:checked').map(function() { return $(this).val(); }).get();
             }
 
-            $this->page->table_renderer->render($headers, $rows, $total_items, $per_page, $paged);
-            ?>
-        </div>
+            function updateBulkBar() {
+                const ids = getChecked();
+                if (ids.length > 0) {
+                    $('#ga-bulk-bar').css('display', 'flex');
+                    $('#ga-bulk-count').text(ids.length + ' user' + (ids.length > 1 ? 's' : '') + ' selected');
+                } else {
+                    $('#ga-bulk-bar').hide();
+                }
+            }
+
+            $('#ga-select-all').on('change', function() {
+                $('.ga-user-checkbox').prop('checked', this.checked);
+                updateBulkBar();
+            });
+
+            $(document).on('change', '.ga-user-checkbox', function() {
+                if (!this.checked) { $('#ga-select-all').prop('checked', false); }
+                updateBulkBar();
+            });
+
+            // ── Bulk Actions ────────────────────────────────────────────────
+            $('#ga-bulk-submit-btn').on('click', function() {
+                const action = $('#ga-bulk-action-select').val();
+                const ids = getChecked();
+                
+                if (action === 'none') {
+                    alert('Please select an action.');
+                    return;
+                }
+                
+                if (!ids.length) {
+                    alert('Please select at least one user.');
+                    return;
+                }
+
+                if (action === 'export_conversations') {
+                    executeExportConversations(ids);
+                }
+            });
+
+            function executeExportConversations(ids) {
+                const $btn    = $('#ga-bulk-submit-btn');
+                const $status = $('#ga-bulk-status');
+
+                $btn.prop('disabled', true).text('Working…');
+                $status.text('Fetching data from server…');
+
+                $.post(ajaxUrl, {
+                    action   : 'growtype_analytics_bulk_export_conversations',
+                    nonce    : nonce,
+                    user_ids : ids,
+                }, function(response) {
+                    $btn.prop('disabled', false).text('Apply');
+
+                    if (!response.success) {
+                        $status.text('Error: ' + (response.data || 'Unknown error'));
+                        return;
+                    }
+
+                    const data   = response.data;
+                    const blob   = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url    = URL.createObjectURL(blob);
+                    const anchor = document.createElement('a');
+                    const ts     = new Date().toISOString().slice(0, 10);
+
+                    anchor.href     = url;
+                    anchor.download = 'conversations-export-' + ts + '.json';
+                    document.body.appendChild(anchor);
+                    anchor.click();
+                    document.body.removeChild(anchor);
+                    URL.revokeObjectURL(url);
+
+                    $status.text(
+                        '✓ Exported ' + data.user_count + ' user(s) · ' +
+                        data.session_count + ' session(s) · ' + data.exported_at
+                    );
+                }).fail(function() {
+                    $btn.prop('disabled', false).text('Apply');
+                    $status.text('Request failed. Check permissions or try again.');
+                });
+            }
+        })(jQuery);
+        </script>
         <?php
     }
 

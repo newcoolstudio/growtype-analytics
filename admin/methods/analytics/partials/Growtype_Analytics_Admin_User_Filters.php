@@ -30,12 +30,12 @@ class Growtype_Analytics_Admin_User_Filters
             //     'color'  => '#00a32a',
             //     'having' => 'message_count > 0',
             // ],
-            // 'no_credits' => [
-            //     'label'  => 'No Credits',
-            //     'icon'   => '🪙',
-            //     'color'  => '#d63638',
-            //     'having' => 'chat_credits_amount = 0',
-            // ],
+            'zero_credits' => [
+                'label'  => '0 Credits',
+                'icon'   => '🪙',
+                'color'  => '#d63638',
+                'having' => 'chat_credits_amount = 0',
+            ],
         ];
     }
 

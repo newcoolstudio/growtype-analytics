@@ -429,13 +429,14 @@ class Growtype_Analytics_Admin_Metrics
                     (SELECT COUNT(p.ID) FROM {$wpdb->posts} p
                      INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
                      WHERE pm.meta_key = '_customer_user' AND pm.meta_value = u.ID
-                     AND p.post_type = 'shop_order' AND p.post_status IN ($paid_placeholders)) as paid_orders
+                     AND p.post_type = 'shop_order' AND p.post_status IN ($paid_placeholders)) as paid_orders,
+                    COALESCE((SELECT CAST(um.meta_value AS SIGNED) FROM `{$wpdb->usermeta}` um WHERE um.user_id = u.ID AND um.meta_key = 'growtype_chat_credits' LIMIT 1), 0) as chat_credits_amount
                 FROM {$wpdb->users} u
                 WHERE 1=1 {$period_sql['sql']}
                 {$email_exclusion['sql']}
                 {$having_sql}
             ) as filtered_users";
-            $count_params = array_merge($paid_statuses, $paid_statuses, $period_sql['params'], $email_exclusion['params']);
+            $count_params = array_merge($paid_statuses, $period_sql['params'], $email_exclusion['params']);
         } else {
             $count_query = "SELECT COUNT(u.ID) FROM {$wpdb->users} u WHERE 1=1 {$period_sql['sql']} {$email_exclusion['sql']}";
             $count_params = array_merge($period_sql['params'], $email_exclusion['params']);
