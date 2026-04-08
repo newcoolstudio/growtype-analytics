@@ -159,6 +159,7 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                         <th><?php _e('Character Profile Visits', 'growtype-analytics'); ?></th>
                         <th><?php _e('Roleplay Profile Visits', 'growtype-analytics'); ?></th>
                         <th><?php _e('Chat Credits', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Emails Sent', 'growtype-analytics'); ?></th>
                         <th><?php _e('Actions', 'growtype-analytics'); ?></th>
                     </tr>
                     </thead>
@@ -219,6 +220,7 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                 <td><?php echo (int)($user['character_profile_visits'] ?? 0); ?></td>
                                 <td><?php echo (int)($user['roleplay_profile_visits'] ?? 0); ?></td>
                                 <td><?php echo (int)($user['chat_credits_amount'] ?? 0); ?></td>
+                                <td><?php echo (int)($user['emails_sent'] ?? 0); ?></td>
                                 <td>
                                     <a href="<?php echo esc_url($analytics_url); ?>" class="button button-small" target="_blank"><?php _e('Analytics', 'growtype-analytics'); ?></a>
                                     <a href="<?php echo esc_url($profile_url); ?>" class="button button-small" target="_blank"><?php _e('User', 'growtype-analytics'); ?></a>

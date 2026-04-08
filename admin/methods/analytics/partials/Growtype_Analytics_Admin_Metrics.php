@@ -387,6 +387,12 @@ class Growtype_Analytics_Admin_Metrics
 
         $chat_credits_select = ", COALESCE((SELECT CAST(um.meta_value AS SIGNED) FROM `{$wpdb->usermeta}` um WHERE um.user_id = u.ID AND um.meta_key = 'growtype_chat_credits' LIMIT 1), 0) as chat_credits_amount";
 
+        $mail_logs_table = $wpdb->prefix . 'growtype_mail_action_logs';
+        $has_mail_logs   = $this->controller->table_exists($mail_logs_table);
+
+        $emails_sent_select = $has_mail_logs
+            ? ", (SELECT COUNT(ml.id) FROM `{$mail_logs_table}` ml WHERE ml.recipient = u.user_email AND ml.delivery_status = 'SENT') as emails_sent"
+            : ", 0 as emails_sent";
 
         // ── HAVING clause from centralized filter registry ────────────────────────
         // To add a new filter edit Growtype_Analytics_Admin_User_Filters::registry() only.
@@ -411,6 +417,7 @@ class Growtype_Analytics_Admin_Metrics
                 {$character_profile_visits_select}
                 {$roleplay_profile_visits_select}
                 {$chat_credits_select}
+                {$emails_sent_select}
             FROM {$wpdb->users} u
             WHERE 1=1 {$period_sql['sql']}
             {$email_exclusion['sql']}
