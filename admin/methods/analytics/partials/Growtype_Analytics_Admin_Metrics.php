@@ -326,133 +326,286 @@ class Growtype_Analytics_Admin_Metrics
         $paid_statuses = $settings['paid_statuses'];
         $paid_placeholders = implode(',', array_fill(0, count($paid_statuses), '%s'));
 
-        $chat_users_table    = $wpdb->prefix . 'growtype_chat_users';
+        $chat_users_table = $wpdb->prefix . 'growtype_chat_users';
         $chat_messages_table = $wpdb->prefix . 'growtype_chat_messages';
-        $chat_sessions_table = $wpdb->prefix . 'growtype_chat_sessions';
-        $chat_us_table       = $wpdb->prefix . 'growtype_chat_user_session';
-        $quiz_results_table  = $wpdb->prefix . 'growtype_quiz_results';
-
-        $has_chat     = $this->controller->table_exists($chat_users_table) && $this->controller->table_exists($chat_messages_table);
-        $has_sessions = $this->controller->table_exists($chat_sessions_table) && $this->controller->table_exists($chat_us_table);
-        $has_quiz     = $this->controller->table_exists($quiz_results_table);
-
-        $chat_session_meta_table = $wpdb->prefix . 'growtype_chat_session_meta';
-        $has_session_meta = $this->controller->table_exists($chat_session_meta_table);
-
         $analytics_tracking_table = $wpdb->prefix . 'growtype_analytics_tracking';
-        $has_analytics_tracking = $this->controller->table_exists($analytics_tracking_table);
-
-        // ── Subquery selects ─────────────────────────────────────────────────────
-        $chat_select = $has_chat
-            ? ", (SELECT COUNT(m.id) FROM `{$chat_messages_table}` m INNER JOIN `{$chat_users_table}` cu ON cu.id = m.user_id WHERE cu.external_id = u.ID AND cu.type = 'wp_user') as message_count"
-            : ", 0 as message_count";
-
-        $regular_chat_visits_select = $has_analytics_tracking
-            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'character_chat') as regular_chat_visits"
-            : ", 0 as regular_chat_visits";
-
-        $roleplay_chat_visits_select = $has_analytics_tracking
-            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'roleplay_chat') as roleplay_chat_visits"
-            : ", 0 as roleplay_chat_visits";
-
-        $roleplay_visited_select = ", (SELECT COUNT(p.ID) FROM `{$wpdb->posts}` p WHERE p.post_author = u.ID AND p.post_type = 'roleplay' AND p.post_status = 'publish') as roleplay_visited";
-
-        $quiz_visited_select = $has_quiz
-            ? ", (SELECT COUNT(qr.id) FROM `{$quiz_results_table}` qr WHERE qr.user_id = u.ID) as quizzes_solved"
-            : ", 0 as quizzes_solved";
-
-        $payment_form_shown_select = $has_analytics_tracking
-            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'offer_shown') as payment_form_shown"
-            : ", 0 as payment_form_shown";
-
-        $checkout_visited_select = $has_analytics_tracking
-            ? ", (SELECT COUNT(at.id) FROM `{$analytics_tracking_table}` at WHERE at.user_id = u.ID AND at.event_type = 'page_plans_visit') as checkout_visited"
-            : ", 0 as checkout_visited";
-
-        $credits_page_visited_select = $has_analytics_tracking
-            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'page_credits_visit') as credits_page_visited"
-            : ", 0 as credits_page_visited";
-
-        $subscription_modal_shown_select = $has_analytics_tracking
-            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'subscription_modal_shown') as subscription_modal_shown"
-            : ", 0 as subscription_modal_shown";
-
-        $character_profile_visits_select = $has_analytics_tracking
-            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'character_profile') as character_profile_visits"
-            : ", 0 as character_profile_visits";
-
-        $roleplay_profile_visits_select = $has_analytics_tracking
-            ? ", (SELECT COUNT(t.id) FROM `{$analytics_tracking_table}` t WHERE t.user_id = u.ID AND t.event_type = 'roleplay_profile') as roleplay_profile_visits"
-            : ", 0 as roleplay_profile_visits";
-
-        $chat_credits_select = ", COALESCE((SELECT CAST(um.meta_value AS SIGNED) FROM `{$wpdb->usermeta}` um WHERE um.user_id = u.ID AND um.meta_key = 'growtype_chat_credits' LIMIT 1), 0) as chat_credits_amount";
-
+        $quiz_results_table = $wpdb->prefix . 'growtype_quiz_results';
         $mail_logs_table = $wpdb->prefix . 'growtype_mail_action_logs';
-        $has_mail_logs   = $this->controller->table_exists($mail_logs_table);
 
-        $emails_sent_select = $has_mail_logs
-            ? ", (SELECT COUNT(ml.id) FROM `{$mail_logs_table}` ml WHERE ml.recipient = u.user_email AND ml.delivery_status = 'SENT') as emails_sent"
-            : ", 0 as emails_sent";
+        $has_chat = $this->controller->table_exists($chat_users_table) && $this->controller->table_exists($chat_messages_table);
+        $has_analytics_tracking = $this->controller->table_exists($analytics_tracking_table);
+        $has_quiz = $this->controller->table_exists($quiz_results_table);
+        $has_mail_logs = $this->controller->table_exists($mail_logs_table);
 
-        // ── HAVING clause from centralized filter registry ────────────────────────
-        // To add a new filter edit Growtype_Analytics_Admin_User_Filters::registry() only.
-        $having_sql = Growtype_Analytics_Admin_User_Filters::build_having_sql((array) $filters);
+        // ── Step 1: Build JOINs + WHERE from active filters ───────────────────────
+        // Params are collected IN THE ORDER their placeholders appear in SQL.
+        // JOINs appear before WHERE, so their params must come first.
+        $active_filters = (array)$filters;
+        $join_sql = '';
+        $join_params = [];   // params for placeholders inside JOIN subqueries
+        $where_sql = '';   // extra AND … conditions appended after WHERE 1=1
 
-
-        // ── Main query ───────────────────────────────────────────────────────────
-        $query = "SELECT u.ID, u.user_email, u.display_name, u.user_registered,
-                (SELECT COUNT(p.ID) FROM {$wpdb->posts} p
-                 INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
-                 WHERE pm.meta_key = '_customer_user' AND pm.meta_value = u.ID
-                 AND p.post_type = 'shop_order' AND p.post_status IN ($paid_placeholders)) as paid_orders
-                {$chat_select}
-                {$regular_chat_visits_select}
-                {$roleplay_chat_visits_select}
-                {$roleplay_visited_select}
-                {$quiz_visited_select}
-                {$payment_form_shown_select}
-                {$checkout_visited_select}
-                {$credits_page_visited_select}
-                {$subscription_modal_shown_select}
-                {$character_profile_visits_select}
-                {$roleplay_profile_visits_select}
-                {$chat_credits_select}
-                {$emails_sent_select}
-            FROM {$wpdb->users} u
-            WHERE 1=1 {$period_sql['sql']}
-            {$email_exclusion['sql']}
-            {$having_sql}
-            ORDER BY u.user_registered DESC
-            LIMIT %d, %d";
-
-        $params = array_merge($paid_statuses, $period_sql['params'], $email_exclusion['params'], [$offset, (int)$per_page]);
-        $results = $wpdb->get_results($this->prepare_dynamic_query($query, $params), ARRAY_A);
-
-        // ── Count query ──────────────────────────────────────────────────────────
-        // When HAVING is active, wrap in a subquery so COUNT is applied after filtering
-        if (!empty($having_sql)) {
-            $count_query = "SELECT COUNT(*) FROM (
-                SELECT u.ID,
-                    (SELECT COUNT(p.ID) FROM {$wpdb->posts} p
-                     INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
-                     WHERE pm.meta_key = '_customer_user' AND pm.meta_value = u.ID
-                     AND p.post_type = 'shop_order' AND p.post_status IN ($paid_placeholders)) as paid_orders,
-                    COALESCE((SELECT CAST(um.meta_value AS SIGNED) FROM `{$wpdb->usermeta}` um WHERE um.user_id = u.ID AND um.meta_key = 'growtype_chat_credits' LIMIT 1), 0) as chat_credits_amount
-                FROM {$wpdb->users} u
-                WHERE 1=1 {$period_sql['sql']}
-                {$email_exclusion['sql']}
-                {$having_sql}
-            ) as filtered_users";
-            $count_params = array_merge($paid_statuses, $period_sql['params'], $email_exclusion['params']);
-        } else {
-            $count_query = "SELECT COUNT(u.ID) FROM {$wpdb->users} u WHERE 1=1 {$period_sql['sql']} {$email_exclusion['sql']}";
-            $count_params = array_merge($period_sql['params'], $email_exclusion['params']);
+        if (in_array('paid_orders_only', $active_filters, true)) {
+            // INNER JOIN: only keep users who have at least one paid order within the selected period.
+            // We re-use $period_sql here but scoped to the order date, not registration date.
+            $order_period_sql = $this->build_period_sql('p.post_date', $days);
+            $join_sql .= " INNER JOIN (
+                SELECT DISTINCT pm.meta_value AS user_id
+                FROM {$wpdb->postmeta} pm
+                INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+                WHERE pm.meta_key = '_customer_user'
+                  AND p.post_type = 'shop_order'
+                  AND p.post_status IN ($paid_placeholders)
+                  {$order_period_sql['sql']}
+            ) paid_filter ON paid_filter.user_id = u.ID";
+            // Params: statuses come before the date params inside the JOIN subquery
+            $join_params = array_merge($join_params, $paid_statuses, $order_period_sql['params']);
+            $active_filters = array_diff($active_filters, ['paid_orders_only']);
         }
 
+        if (in_array('zero_credits', $active_filters, true)) {
+            // LEFT JOIN + WHERE NULL-or-zero (no per-row subquery)
+            $join_sql .= " LEFT JOIN {$wpdb->usermeta} um_c
+                              ON um_c.user_id = u.ID
+                             AND um_c.meta_key = 'growtype_chat_credits'";
+            $where_sql .= " AND (um_c.meta_value IS NULL OR um_c.meta_value = '0')";
+            $active_filters = array_diff($active_filters, ['zero_credits']);
+        }
+
+        // Any remaining unrecognised filters fall back to HAVING (legacy safety net)
+        $having_sql = Growtype_Analytics_Admin_User_Filters::build_having_sql($active_filters);
+        $having_selects = ''; // computed aliases needed if HAVING is active
+        $having_params = [];
+
+        if (!empty($having_sql)) {
+            if (strpos($having_sql, 'paid_orders') !== false) {
+                $having_selects .= ", (SELECT COUNT(p2.ID)
+                      FROM {$wpdb->posts} p2
+                      INNER JOIN {$wpdb->postmeta} pm2 ON pm2.post_id = p2.ID
+                      WHERE pm2.meta_key = '_customer_user'
+                        AND pm2.meta_value = u.ID
+                        AND p2.post_type = 'shop_order'
+                        AND p2.post_status IN ($paid_placeholders)) AS paid_orders";
+                $having_params = array_merge($having_params, $paid_statuses);
+            }
+            if (strpos($having_sql, 'chat_credits_amount') !== false) {
+                $having_selects .= ", COALESCE((SELECT CAST(um2.meta_value AS SIGNED)
+                      FROM {$wpdb->usermeta} um2
+                      WHERE um2.user_id = u.ID
+                        AND um2.meta_key = 'growtype_chat_credits'
+                      LIMIT 1), 0) AS chat_credits_amount";
+            }
+        }
+
+        // ── Step 2: Fetch paginated IDs only ───────────────────────────────────
+        // $from_sql is reused for both the paged ID query and the total count.
+        $from_sql = " FROM {$wpdb->users} u
+                     {$join_sql}
+                     WHERE 1=1
+                     {$period_sql['sql']}
+                     {$email_exclusion['sql']}
+                     {$where_sql}";
+
+        if (!empty($having_sql)) {
+            $ids_query = "SELECT t.ID
+                FROM (SELECT u.ID {$having_selects} {$from_sql}) AS t
+                {$having_sql}
+                ORDER BY t.ID DESC
+                LIMIT %d, %d";
+            // Inner SELECT aliases come first, then the FROM params, then LIMIT
+            $ids_params = array_merge(
+                $having_params,
+                $join_params,
+                $period_sql['params'],
+                $email_exclusion['params'],
+                [$offset, (int)$per_page]
+            );
+        } else {
+            $ids_query = "SELECT u.ID {$from_sql} ORDER BY u.user_registered DESC LIMIT %d, %d";
+            $ids_params = array_merge(
+                $join_params,
+                $period_sql['params'],
+                $email_exclusion['params'],
+                [$offset, (int)$per_page]
+            );
+        }
+
+        $user_ids = $wpdb->get_col($this->prepare_dynamic_query($ids_query, $ids_params));
+
+        // Count params (same as $ids_params minus the LIMIT pair)
+        $count_params = array_merge(
+            !empty($having_sql) ? $having_params : [],
+            $join_params,
+            $period_sql['params'],
+            $email_exclusion['params']
+        );
+
+        if (empty($user_ids)) {
+            $count_query = !empty($having_sql)
+                ? "SELECT COUNT(*) FROM (SELECT u.ID {$having_selects} {$from_sql}) AS t {$having_sql}"
+                : "SELECT COUNT(DISTINCT u.ID) {$from_sql}";
+            return [
+                'items' => [],
+                'total_items' => (int)$wpdb->get_var($this->prepare_dynamic_query($count_query, $count_params)),
+            ];
+        }
+
+        // ── Step 3: Bulk-fetch display stats for the ~20 IDs on this page ──────
+        $user_ids_ph = implode(',', array_fill(0, count($user_ids), '%d'));
+        $user_ids_int = array_map('intval', $user_ids);
+
+        // Base user rows (integer IDs only → safe direct interpolation)
+        $users_data = $wpdb->get_results($this->prepare_dynamic_query(
+            "SELECT ID, user_email, display_name, user_registered
+             FROM {$wpdb->users} WHERE ID IN ($user_ids_ph)",
+            $user_ids_int
+        ), ARRAY_A);
+
+        $results_map = [];
+        foreach ($users_data as $row) {
+            $results_map[(int)$row['ID']] = array_merge($row, [
+                'paid_orders' => 0,
+                'chat_credits_amount' => 0,
+                'message_count' => 0,
+                'regular_chat_visits' => 0,
+                'roleplay_chat_visits' => 0,
+                'roleplay_visited' => 0,
+                'quizzes_solved' => 0,
+                'payment_form_shown' => 0,
+                'checkout_visited' => 0,
+                'credits_page_visited' => 0,
+                'subscription_modal_shown' => 0,
+                'character_profile_visits' => 0,
+                'roleplay_profile_visits' => 0,
+                'emails_sent' => 0,
+            ]);
+        }
+
+        // A. Paid orders
+        $rows = $wpdb->get_results($this->prepare_dynamic_query(
+            "SELECT pm.meta_value AS user_id, COUNT(p.ID) AS cnt
+             FROM {$wpdb->posts} p
+             INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+             WHERE pm.meta_key = '_customer_user'
+               AND pm.meta_value IN ($user_ids_ph)
+               AND p.post_type = 'shop_order'
+               AND p.post_status IN ($paid_placeholders)
+             GROUP BY pm.meta_value",
+            array_merge($user_ids_int, $paid_statuses)
+        ), ARRAY_A);
+        foreach ($rows as $r) {
+            $results_map[(int)$r['user_id']]['paid_orders'] = (int)$r['cnt'];
+        }
+
+        // B. All analytics event types in one query
+        if ($has_analytics_tracking) {
+            $rows = $wpdb->get_results($this->prepare_dynamic_query(
+                "SELECT user_id, event_type, COUNT(*) AS cnt
+                 FROM `{$analytics_tracking_table}`
+                 WHERE user_id IN ($user_ids_ph)
+                 GROUP BY user_id, event_type",
+                $user_ids_int
+            ), ARRAY_A);
+            $event_map = [
+                'character_chat' => 'regular_chat_visits',
+                'roleplay_chat' => 'roleplay_chat_visits',
+                'offer_shown' => 'payment_form_shown',
+                'page_plans_visit' => 'checkout_visited',
+                'page_credits_visit' => 'credits_page_visited',
+                'subscription_modal_shown' => 'subscription_modal_shown',
+                'character_profile' => 'character_profile_visits',
+                'roleplay_profile' => 'roleplay_profile_visits',
+            ];
+            foreach ($rows as $r) {
+                if (isset($event_map[$r['event_type']])) {
+                    $results_map[(int)$r['user_id']][$event_map[$r['event_type']]] = (int)$r['cnt'];
+                }
+            }
+        }
+
+        // C. Chat messages
+        if ($has_chat) {
+            $rows = $wpdb->get_results($this->prepare_dynamic_query(
+                "SELECT cu.external_id AS user_id, COUNT(m.id) AS cnt
+                 FROM `{$chat_messages_table}` m
+                 INNER JOIN `{$chat_users_table}` cu ON cu.id = m.user_id
+                 WHERE cu.external_id IN ($user_ids_ph) AND cu.type = 'wp_user'
+                 GROUP BY cu.external_id",
+                $user_ids_int
+            ), ARRAY_A);
+            foreach ($rows as $r) {
+                $results_map[(int)$r['user_id']]['message_count'] = (int)$r['cnt'];
+            }
+        }
+
+        // D. Roleplays created
+        $rows = $wpdb->get_results($this->prepare_dynamic_query(
+            "SELECT post_author AS user_id, COUNT(ID) AS cnt
+             FROM `{$wpdb->posts}`
+             WHERE post_author IN ($user_ids_ph) AND post_type = 'roleplay' AND post_status = 'publish'
+             GROUP BY post_author",
+            $user_ids_int
+        ), ARRAY_A);
+        foreach ($rows as $r) {
+            $results_map[(int)$r['user_id']]['roleplay_visited'] = (int)$r['cnt'];
+        }
+
+        // E. Chat credits
+        $rows = $wpdb->get_results($this->prepare_dynamic_query(
+            "SELECT user_id, meta_value
+             FROM `{$wpdb->usermeta}`
+             WHERE user_id IN ($user_ids_ph) AND meta_key = 'growtype_chat_credits'",
+            $user_ids_int
+        ), ARRAY_A);
+        foreach ($rows as $r) {
+            $results_map[(int)$r['user_id']]['chat_credits_amount'] = (int)$r['meta_value'];
+        }
+
+        // F. Emails sent
+        if ($has_mail_logs) {
+            $rows = $wpdb->get_results($this->prepare_dynamic_query(
+                "SELECT u.ID AS user_id, COUNT(ml.id) AS cnt
+                 FROM `{$mail_logs_table}` ml
+                 INNER JOIN `{$wpdb->users}` u ON ml.recipient = u.user_email
+                 WHERE u.ID IN ($user_ids_ph) AND ml.delivery_status = 'SENT'
+                 GROUP BY u.ID",
+                $user_ids_int
+            ), ARRAY_A);
+            foreach ($rows as $r) {
+                $results_map[(int)$r['user_id']]['emails_sent'] = (int)$r['cnt'];
+            }
+        }
+
+        // G. Quizzes solved
+        if ($has_quiz) {
+            $rows = $wpdb->get_results($this->prepare_dynamic_query(
+                "SELECT user_id, COUNT(id) AS cnt
+                 FROM `{$quiz_results_table}`
+                 WHERE user_id IN ($user_ids_ph)
+                 GROUP BY user_id",
+                $user_ids_int
+            ), ARRAY_A);
+            foreach ($rows as $r) {
+                $results_map[(int)$r['user_id']]['quizzes_solved'] = (int)$r['cnt'];
+            }
+        }
+
+        // Preserve order from Step 2 (already sorted DESC by registration)
+        $results = [];
+        foreach ($user_ids as $uid) {
+            if (isset($results_map[(int)$uid])) {
+                $results[] = $results_map[(int)$uid];
+            }
+        }
+
+        // ── Step 4: Total count (same JOINs/WHERE, no LIMIT) ───────────────────
+        $count_query = !empty($having_sql)
+            ? "SELECT COUNT(*) FROM (SELECT u.ID {$having_selects} {$from_sql}) AS t {$having_sql}"
+            : "SELECT COUNT(DISTINCT u.ID) {$from_sql}";
         $total_items = (int)$wpdb->get_var($this->prepare_dynamic_query($count_query, $count_params));
 
         return [
-            'items'       => $results,
+            'items' => $results,
             'total_items' => $total_items,
         ];
     }
