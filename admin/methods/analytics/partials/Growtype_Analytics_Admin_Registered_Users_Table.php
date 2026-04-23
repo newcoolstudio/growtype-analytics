@@ -158,6 +158,8 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                         <th><?php _e('Subscription Modal Shown', 'growtype-analytics'); ?></th>
                         <th><?php _e('Character Profile Visits', 'growtype-analytics'); ?></th>
                         <th><?php _e('Roleplay Profile Visits', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Create Character', 'growtype-analytics'); ?></th>
+                        <th><?php _e('Create Roleplay', 'growtype-analytics'); ?></th>
                         <th><?php _e('Chat Credits', 'growtype-analytics'); ?></th>
                         <th><?php _e('Emails Sent', 'growtype-analytics'); ?></th>
                         <th><?php _e('Actions', 'growtype-analytics'); ?></th>
@@ -166,7 +168,7 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                     <tbody>
                     <?php if (empty($users)): ?>
                         <tr>
-                            <td colspan="18"><?php _e('No data available for this view yet.', 'growtype-analytics'); ?></td>
+                            <td colspan="20"><?php _e('No data available for this view yet.', 'growtype-analytics'); ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($users as $user):
@@ -227,6 +229,14 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                 <td><?php echo (int)($user['subscription_modal_shown'] ?? 0); ?></td>
                                 <td><?php echo (int)($user['character_profile_visits'] ?? 0); ?></td>
                                 <td><?php echo (int)($user['roleplay_profile_visits'] ?? 0); ?></td>
+                                <td>
+                                    <?php $cv = (int)($user['create_character_visited'] ?? 0); ?>
+                                    <?php echo $cv > 0 ? '<span style="color:#2e7d32;font-weight:700;">✓</span>' : '<span style="color:#9e9e9e;">–</span>'; ?>
+                                </td>
+                                <td>
+                                    <?php $rv = (int)($user['create_roleplay_visited'] ?? 0); ?>
+                                    <?php echo $rv > 0 ? '<span style="color:#2e7d32;font-weight:700;">✓</span>' : '<span style="color:#9e9e9e;">–</span>'; ?>
+                                </td>
                                 <td><?php echo (int)($user['chat_credits_amount'] ?? 0); ?></td>
                                 <td><?php echo (int)($user['emails_sent'] ?? 0); ?></td>
                                 <td>

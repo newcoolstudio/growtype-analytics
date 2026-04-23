@@ -477,6 +477,8 @@ class Growtype_Analytics_Admin_Metrics
                 'subscription_modal_shown' => 0,
                 'character_profile_visits' => 0,
                 'roleplay_profile_visits' => 0,
+                'create_character_visited' => 0,
+                'create_roleplay_visited' => 0,
                 'emails_sent' => 0,
             ]);
         }
@@ -507,14 +509,16 @@ class Growtype_Analytics_Admin_Metrics
                 $user_ids_int
             ), ARRAY_A);
             $event_map = [
-                'character_chat' => 'regular_chat_visits',
-                'roleplay_chat' => 'roleplay_chat_visits',
-                'offer_shown' => 'payment_form_shown',
-                'page_plans_visit' => 'checkout_visited',
-                'page_credits_visit' => 'credits_page_visited',
-                'subscription_modal_shown' => 'subscription_modal_shown',
-                'character_profile' => 'character_profile_visits',
-                'roleplay_profile' => 'roleplay_profile_visits',
+                'character_chat'            => 'regular_chat_visits',
+                'roleplay_chat'             => 'roleplay_chat_visits',
+                'offer_shown'               => 'payment_form_shown',
+                'page_plans_visit'          => 'checkout_visited',
+                'page_credits_visit'        => 'credits_page_visited',
+                'subscription_modal_shown'  => 'subscription_modal_shown',
+                'character_profile'         => 'character_profile_visits',
+                'roleplay_profile'          => 'roleplay_profile_visits',
+                'page_create_character_visit' => 'create_character_visited',
+                'page_create_roleplay_visit'  => 'create_roleplay_visited',
             ];
             foreach ($rows as $r) {
                 if (isset($event_map[$r['event_type']])) {
