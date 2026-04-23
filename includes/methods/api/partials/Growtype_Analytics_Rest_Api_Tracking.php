@@ -73,6 +73,8 @@ class Growtype_Analytics_Rest_Api_Tracking
             return false;
         }
 
+        error_log(sprintf('DEBUG: Growtype Analytics Tracking Fired | Type: %s | ID: %s | ObjectType: %s | Metadata: %s', $event_type, $object_id, $object_type, json_encode($metadata)));
+
         return Growtype_Analytics_Database::track($event_type, $object_id, $object_type, $metadata);
     }
 }

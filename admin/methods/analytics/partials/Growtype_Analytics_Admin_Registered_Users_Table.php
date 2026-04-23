@@ -196,7 +196,15 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                 <td><?php echo esc_html($user['ID']); ?></td>
                                 <td><?php echo esc_html($user['user_email']); ?></td>
                                 <td><?php echo esc_html(wp_date(get_option('date_format') . ' H:i', strtotime($user['user_registered']))); ?></td>
-                                <td><?php echo esc_html($user['paid_orders']); ?></td>
+                                <td>
+                                    <?php if ((int)$user['paid_orders'] > 0): ?>
+                                        <a href="<?php echo esc_url(add_query_arg(['page' => 'wc-orders', 's' => $user['user_email'], 'search-filter' => 'all'], admin_url('admin.php'))); ?>" target="_blank" style="font-weight:600; text-decoration:underline;">
+                                            <?php echo esc_html($user['paid_orders']); ?>
+                                        </a>
+                                    <?php else: ?>
+                                        0
+                                    <?php endif; ?>
+                                </td>
                                 <td><?php echo esc_html($user['message_count']); ?></td>
                                 <td><?php echo (int)($user['regular_chat_visits'] ?? 0); ?></td>
                                 <td><?php echo (int)($user['roleplay_chat_visits'] ?? 0); ?></td>
