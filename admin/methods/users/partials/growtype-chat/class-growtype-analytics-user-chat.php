@@ -25,6 +25,9 @@ class Growtype_Analytics_User_Chat
         // Funnel integration
         add_filter('growtype_analytics_funnel_steps', array($this, 'add_chat_funnel_steps'), 10, 2);
         add_filter('growtype_analytics_funnel_step_completed', array($this, 'check_chat_funnel_completion'), 10, 3);
+
+        // Single-user session export (same format as growtypeSessionsExportData)
+        add_action('wp_ajax_growtype_analytics_export_user_sessions', [__CLASS__, 'ajax_export_sessions']);
     }
 
     /**
@@ -63,6 +66,133 @@ class Growtype_Analytics_User_Chat
         }
 
         return $completed;
+    }
+
+    /**
+     * AJAX handler: return all sessions for a WP user in growtypeSessionsExportData format.
+     */
+    public static function ajax_export_sessions(): void
+    {
+        check_ajax_referer('growtype_analytics_bulk_actions', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Forbidden', 403);
+        }
+
+        $wp_user_id = isset($_POST['user_id']) ? absint($_POST['user_id']) : 0;
+        if (!$wp_user_id) {
+            wp_send_json_error('Invalid user ID');
+        }
+
+        $instance    = new self();
+        $export_data = $instance->get_sessions_export_data($wp_user_id);
+        wp_send_json_success($export_data);
+    }
+
+    /**
+     * Build session export data for a WP user in the same format
+     * as the growtypeSessionsExportData JS variable (session_id, settings, messages[]).
+     */
+    private function get_sessions_export_data(int $wp_user_id): array
+    {
+        global $wpdb;
+
+        $chat_user_id = $this->get_chat_user_id($wp_user_id);
+        if (!$chat_user_id) {
+            return [];
+        }
+
+        $sessions = $wpdb->get_results($wpdb->prepare(
+            "SELECT s.*
+            FROM {$wpdb->prefix}growtype_chat_sessions s
+            INNER JOIN {$wpdb->prefix}growtype_chat_user_session us ON s.id = us.session_id
+            WHERE us.user_id = %d
+            ORDER BY s.created_at DESC
+            LIMIT 20",
+            $chat_user_id
+        ));
+
+        if (empty($sessions)) {
+            return [];
+        }
+
+        // Batch-fetch messages
+        $session_ids = wp_list_pluck($sessions, 'id');
+        $all_messages = [];
+        if (!empty($session_ids)) {
+            $ids_in = implode(',', array_map('intval', $session_ids));
+            $rows = $wpdb->get_results(
+                "SELECT m.*, sm.session_id
+                 FROM {$wpdb->prefix}growtype_chat_messages m
+                 INNER JOIN {$wpdb->prefix}growtype_chat_session_message sm ON m.id = sm.message_id
+                 WHERE sm.session_id IN ({$ids_in})
+                 ORDER BY m.created_at ASC"
+            );
+            foreach ($rows as $row) {
+                $all_messages[$row->session_id][] = $row;
+            }
+            if (class_exists('Growtype_Chat_Session')) {
+                Growtype_Chat_Session::get_settings_batch($session_ids);
+            }
+        }
+
+        $export_data = [];
+
+        foreach ($sessions as $session) {
+            $messages      = $all_messages[$session->id] ?? [];
+            $message_count = count($messages);
+
+            $user_msgs = array_filter($messages, function ($m) use ($chat_user_id) {
+                return isset($m->author_type) ? $m->author_type === 'user' : (int)$m->user_id === (int)$chat_user_id;
+            });
+            $bot_msgs = array_filter($messages, function ($m) use ($chat_user_id) {
+                return isset($m->author_type) ? $m->author_type === 'bot' : (int)$m->user_id !== (int)$chat_user_id;
+            });
+
+            $settings = [];
+            if (class_exists('Growtype_Chat_Session')) {
+                $chat_session = Growtype_Chat_Session::get($session->id);
+                $settings     = $chat_session['settings'] ?? [];
+            }
+
+            $session_export = [
+                'session_id'    => $session->id,
+                'created_at'    => $session->created_at,
+                'user_messages' => count($user_msgs),
+                'bot_responses' => count($bot_msgs),
+                'total_messages'=> $message_count,
+                'settings'      => $settings,
+                'messages'      => [],
+            ];
+
+            foreach ($messages as $message) {
+                $is_user = isset($message->author_type)
+                    ? $message->author_type === 'user'
+                    : (int)$message->user_id === (int)$chat_user_id;
+
+                $content = $message->content;
+                $decoded = class_exists('Growtype_Chat_Message')
+                    ? Growtype_Chat_Message::decode_content($content)
+                    : $content;
+
+                // Strip HTML from main_text
+                if (is_array($decoded) && isset($decoded['main_text'])) {
+                    $decoded['main_text'] = trim(strip_tags(html_entity_decode((string)$decoded['main_text'], ENT_QUOTES, 'UTF-8')));
+                } elseif (is_string($decoded)) {
+                    $decoded = trim(strip_tags(html_entity_decode($decoded, ENT_QUOTES, 'UTF-8')));
+                }
+
+                $session_export['messages'][] = [
+                    'role'       => $is_user ? 'user' : 'bot',
+                    'content'    => $decoded,
+                    'created_at' => $message->created_at,
+                ];
+            }
+
+            $export_data[] = $session_export;
+        }
+
+        return $export_data;
     }
 
     /**
@@ -105,86 +235,70 @@ class Growtype_Analytics_User_Chat
             return '<div class="empty-state">No chat sessions found</div>';
         }
 
-        $export_data = []; // Will collect structured data for JSON export
+        // Pre-build all export data via the single source-of-truth method
+        $export_data_raw = $this->get_sessions_export_data($user_id);
+        // Index by session_id for O(1) lookup during HTML rendering
+        $export_data_by_session = [];
+        foreach ($export_data_raw as $ed) {
+            $export_data_by_session[(int)$ed['session_id']] = $ed;
+        }
 
         $html = '<div class="chat-sessions-list">';
 
-        // Batch fetching for optimization
+        // All data comes from get_sessions_export_data() — no extra DB queries needed here.
+        // Build a messages lookup keyed by session_id for HTML rendering.
         $session_ids = wp_list_pluck($sessions, 'id');
         $all_messages = [];
         if (!empty($session_ids)) {
+            global $wpdb;
             $ids_in = implode(',', array_map('intval', $session_ids));
             $all_messages_results = $wpdb->get_results(
                 "SELECT m.*, sm.session_id
                  FROM {$wpdb->prefix}growtype_chat_messages m
                  INNER JOIN {$wpdb->prefix}growtype_chat_session_message sm ON m.id = sm.message_id
-                 WHERE sm.session_id IN ($ids_in)
+                 WHERE sm.session_id IN ({$ids_in})
                  ORDER BY m.created_at ASC"
             );
             foreach ($all_messages_results as $msg) {
                 $all_messages[$msg->session_id][] = $msg;
             }
-
-            // Also warm up the metadata cache for these sessions in one query
+            // Warm up avatar/featured-image cache (settings already warmed by get_sessions_export_data)
             if (class_exists('Growtype_Chat_Session')) {
                 Growtype_Chat_Session::get_settings_batch($session_ids);
             }
         }
 
         foreach ($sessions as $session) {
-            $session_export = []; // Export data for this session
 
-            // Use batched messages
+            // Use batched messages (still needed for HTML message rendering below)
             $messages = $all_messages[$session->id] ?? [];
 
-            $message_count = count($messages);
-            $user_messages = array_filter($messages, function ($msg) use ($chat_user_id) {
-                if (isset($msg->author_type)) {
-                    return $msg->author_type === 'user';
-                }
-                return (int)$msg->user_id === (int)$chat_user_id;
-            });
-            $bot_messages = array_filter($messages, function ($msg) use ($chat_user_id) {
-                if (isset($msg->author_type)) {
-                    return $msg->author_type === 'bot';
-                }
-                return (int)$msg->user_id !== (int)$chat_user_id;
-            });
+            // Export data is pre-built via get_sessions_export_data()
+            $session_export  = $export_data_by_session[(int)$session->id] ?? [];
+            $message_count   = $session_export['total_messages'] ?? count($messages);
+            $user_msg_count  = $session_export['user_messages']  ?? 0;
+            $bot_msg_count   = $session_export['bot_responses']  ?? 0;
 
-            $created_time = strtotime($session->created_at);
-            $time_ago = human_time_diff($created_time, current_time('timestamp')) . ' ago';
-
-            // Extract character settings and thumbnail early
-            $settings = [];
-            $character_slug = '';
+            // UI-only: timestamps, settings display, avatar images
+            $created_time   = strtotime($session->created_at);
+            $time_ago       = human_time_diff($created_time, current_time('timestamp')) . ' ago';
+            $settings       = $session_export['settings'] ?? [];
+            $character_slug = $settings['slug'] ?? '';
             $bot_image_html = '<div class="session-icon">💬</div>';
 
             if (class_exists('Growtype_Chat_Session')) {
                 $chat_session = Growtype_Chat_Session::get($session->id);
-                $settings = $chat_session['settings'] ?? [];
-                $character_slug = $settings['slug'] ?? '';
-
-                    if (!empty($chat_session['featured_images'])) {
-                        $bot_image_html = '<div class="session-icon g-chatsessions-single-image" style="padding:0; background:transparent; display:flex; gap:4px; max-width:80px; overflow:hidden;">';
-                        foreach ($chat_session['featured_images'] as $featured_image) {
-                            if (isset($featured_image['url'])) {
-                                $bot_image_html .= '<div class="g-chatsessions-single-image-user" style="min-width:36px;width:56px;height:56px;border-radius:50%;background: url(\'' . esc_url($featured_image['url']) . '\');background-size: cover;background-position: center;"></div>';
-                            }
+                if (!empty($chat_session['featured_images'])) {
+                    $bot_image_html = '<div class="session-icon g-chatsessions-single-image" style="padding:0; background:transparent; display:flex; gap:4px; max-width:80px; overflow:hidden;">';
+                    foreach ($chat_session['featured_images'] as $featured_image) {
+                        if (isset($featured_image['url'])) {
+                            $bot_image_html .= '<div class="g-chatsessions-single-image-user" style="min-width:36px;width:56px;height:56px;border-radius:50%;background: url(\'' . esc_url($featured_image['url']) . '\');background-size: cover;background-position: center;"></div>';
                         }
-                        $bot_image_html .= '</div>';
                     }
+                    $bot_image_html .= '</div>';
                 }
+            }
 
-            // Build export data for this session
-            $session_export = [
-                'session_id'      => $session->id,
-                'created_at'      => $session->created_at,
-                'user_messages'   => count($user_messages),
-                'bot_responses'   => count($bot_messages),
-                'total_messages'  => $message_count,
-                'settings'        => $settings,
-                'messages'        => [],
-            ];
 
             $html .= '<div class="chat-session-item">';
             $html .= '<div class="session-header">';
@@ -204,7 +318,7 @@ class Growtype_Analytics_User_Chat
 
             $html .= '<div class="session-meta">';
             $html .= esc_html(date('M j, Y g:i A', $created_time)) . ' (' . esc_html($time_ago) . ')';
-            $html .= ' • ' . count($user_messages) . ' user messages • ' . count($bot_messages) . ' bot responses';
+            $html .= ' • ' . $user_msg_count . ' user messages • ' . $bot_msg_count . ' bot responses';
             $html .= ' • ' . $chat_type_label;
             $html .= '</div>';
 
@@ -287,15 +401,13 @@ class Growtype_Analytics_User_Chat
                     $html .= '<div class="chat-message ' . ($is_user ? 'user-message' : 'bot-message') . '">';
                     $html .= '<div class="message-author">' . ($is_user ? '👤 User' : '🤖 Bot') . '</div>';
                     
-                    // Decode/Decrypt message content
+                    // Decode content for HTML rendering only
                     $content = $message->content;
                     $rendered_message = '';
-                    $decoded_for_export = null;
-                    
+
                     if (class_exists('Growtype_Chat_Message')) {
                         $decoded = Growtype_Chat_Message::decode_content($content);
-                        $decoded_for_export = $decoded;
-                        
+
                         if (is_array($decoded)) {
                             // Render Main Text
                             if (!empty($decoded['main_text'])) {
@@ -349,19 +461,12 @@ class Growtype_Analytics_User_Chat
                             }
                         } else {
                             $rendered_message = wp_kses_post($decoded);
-                            $decoded_for_export = $decoded;
                         }
                     } else {
                         $rendered_message = wp_kses_post($content);
-                        $decoded_for_export = $content;
                     }
 
-                    // Collect message for export
-                    $session_export['messages'][] = [
-                        'role'       => $is_user ? 'user' : 'bot',
-                        'content'    => $decoded_for_export,
-                        'created_at' => $message->created_at,
-                    ];
+
                     
                     $html .= '<div class="message-content">' . $rendered_message . '</div>';
                     $html .= '<div class="message-time">' . esc_html(date('g:i A', strtotime($message->created_at))) . '</div>';
@@ -372,13 +477,13 @@ class Growtype_Analytics_User_Chat
             $html .= '</div>';
             $html .= '</div>';
 
-            $export_data[] = $session_export;
+
         }
 
         $html .= '</div>';
 
         // Embed export data and add JavaScript for toggle + export
-        $export_json = wp_json_encode($export_data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        $export_json = wp_json_encode($export_data_raw, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         $html .= '<script>
         var growtypeSessionsExportData = ' . $export_json . ';
 

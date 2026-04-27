@@ -245,6 +245,9 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                     <?php if (!empty($lead_profile_url)): ?>
                                     <a href="<?php echo esc_url($lead_profile_url); ?>" class="button button-small" target="_blank"><?php _e('Lead', 'growtype-analytics'); ?></a>
                                     <?php endif; ?>
+                                    <button type="button" class="button button-small ga-copy-user-conv" data-user-id="<?php echo esc_attr($user['ID']); ?>">
+                                        <?php _e('Copy conversations', 'growtype-analytics'); ?>
+                                    </button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -328,9 +331,9 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                         const editUrl   = row.edit_url || '#';
                         const safeLabel = $('<span>').text(label).html();
                         html += '<tr style="border-bottom:1px solid #f9f9f9;">'
-                              + '<td style="padding:5px 6px;"><a href="' + editUrl + '" target="_blank" style="color:#2271b1; text-decoration:none;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">' + safeLabel + '</a></td>'
-                              + '<td style="padding:5px 6px; text-align:right; font-weight:600; color:#1d2327;">' + row.cnt + '</td>'
-                              + '</tr>';
+                               + '<td style="padding:5px 6px;"><a href="' + editUrl + '" target="_blank" style="color:#2271b1; text-decoration:none;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">' + safeLabel + '</a></td>'
+                               + '<td style="padding:5px 6px; text-align:right; font-weight:600; color:#1d2327;">' + row.cnt + '</td>'
+                               + '</tr>';
                     });
                     html += '</table>';
                     $popover.find('#ga-offer-popover-body').html(html);
@@ -369,6 +372,49 @@ class Growtype_Analytics_Admin_Registered_Users_Table
             $(document).on('change', '.ga-user-checkbox', function() {
                 if (!this.checked) { $('#ga-select-all').prop('checked', false); }
                 updateBulkBar();
+            });
+
+            // ── Copy Conversations JSON to Clipboard (mirrors .copy-session behavior) ─
+            $(document).on('click', '.ga-copy-user-conv', function(e) {
+                e.preventDefault();
+                const $btn     = $(this);
+                const userId   = $btn.data('user-id');
+                const original = $btn.text();
+
+                $btn.prop('disabled', true).text('Copying…');
+
+                $.post(ajaxUrl, {
+                    action  : 'growtype_analytics_export_user_sessions',
+                    nonce   : nonce,
+                    user_id : userId,
+                }, function(response) {
+                    if (!response.success || !response.data) {
+                        $btn.prop('disabled', false).text('✗ Failed');
+                        setTimeout(function() { $btn.text(original); }, 2000);
+                        return;
+                    }
+
+                    const json = JSON.stringify(response.data, null, 2);
+
+                    navigator.clipboard.writeText(json).then(function() {
+                        $btn.prop('disabled', false).text('✓ Copied!');
+                        setTimeout(function() { $btn.text(original); }, 2000);
+                    }).catch(function() {
+                        // Fallback for older browsers
+                        const ta = document.createElement('textarea');
+                        ta.value = json;
+                        ta.style.position = 'fixed'; ta.style.opacity = '0';
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                        $btn.prop('disabled', false).text('✓ Copied!');
+                        setTimeout(function() { $btn.text(original); }, 2000);
+                    });
+                }).fail(function() {
+                    $btn.prop('disabled', false).text('✗ Failed');
+                    setTimeout(function() { $btn.text(original); }, 2000);
+                });
             });
 
             // ── Bulk Actions ────────────────────────────────────────────────
