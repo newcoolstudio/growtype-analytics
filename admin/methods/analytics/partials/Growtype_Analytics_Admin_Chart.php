@@ -98,7 +98,7 @@ class Growtype_Analytics_Admin_Chart
         $values = array();
         $start_date = date('Y-m-d', strtotime("-" . ($days - 1) . " days"));
 
-        $batched_users = $this->controller->metrics->get_batched_user_data($start_date);
+        $batched_users = $this->controller->users_metrics->get_batched_user_data($start_date);
 
         // Generate date range
         for ($i = $days - 1; $i >= 0; $i--) {

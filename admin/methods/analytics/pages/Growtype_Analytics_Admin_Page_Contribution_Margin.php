@@ -20,7 +20,7 @@ class Growtype_Analytics_Admin_Page_Contribution_Margin extends Growtype_Analyti
     {
         $snapshot_settings = $this->controller->get_snapshot_settings();
         $orders = $this->controller->metrics->get_order_metrics($days, $snapshot_settings);
-        $active_users = $this->controller->metrics->get_active_user_count($days, $snapshot_settings);
+        $active_users = $this->controller->users_metrics->get_active_user_count($days, $snapshot_settings);
         $revenue = (float)$orders['revenue'];
         $paid_orders = (int)$orders['paid_orders'];
 

@@ -38,6 +38,7 @@ class Growtype_Analytics_Admin_Page
     public $posthog;
     public $menu;
     public $table_renderer;
+    public $users_metrics;
     public $submenu_pages = array();
 
 
@@ -63,7 +64,8 @@ class Growtype_Analytics_Admin_Page
             $this->shared_report_page,
             $this->posthog,
             $this->menu,
-            $this->table_renderer
+            $this->table_renderer,
+            $this->users_metrics
         );
 
         if ($this->hooks) {
@@ -81,6 +83,7 @@ class Growtype_Analytics_Admin_Page
             $this->reports;
             $this->decision_renderer;
             $this->table_renderer;
+            $this->users_metrics;
             $this->posthog;
 
             add_action('wp_ajax_growtype_analytics_toggle_pinned_kpi', array($this, 'ajax_toggle_pinned_kpi'));
@@ -94,7 +97,7 @@ class Growtype_Analytics_Admin_Page
     {
         switch ($name) {
             case 'decision_renderer':
-                require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_User_Filters.php';
+                require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Users_Filters.php';
                 require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Registered_Users_Table.php';
                 Growtype_Analytics_Admin_Registered_Users_Table::register_hooks();
 
@@ -131,8 +134,8 @@ class Growtype_Analytics_Admin_Page
                 $this->funnel = new Growtype_Analytics_Admin_Funnel($this);
                 return $this->funnel;
             case 'metrics':
-                if (!class_exists('Growtype_Analytics_Admin_User_Filters')) {
-                    require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_User_Filters.php';
+                if (!class_exists('Growtype_Analytics_Admin_Users_Filters')) {
+                    require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Users_Filters.php';
                 }
                 require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Metrics.php';
                 $this->metrics = new Growtype_Analytics_Admin_Metrics($this);
@@ -165,6 +168,10 @@ class Growtype_Analytics_Admin_Page
                 require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Menu.php';
                 $this->menu = new Growtype_Analytics_Admin_Menu($this);
                 return $this->menu;
+            case 'users_metrics':
+                require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Users_Metrics.php';
+                $this->users_metrics = new Growtype_Analytics_Admin_Users_Metrics($this);
+                return $this->users_metrics;
         }
 
         return null;

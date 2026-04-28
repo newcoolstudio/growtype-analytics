@@ -94,7 +94,7 @@ class Growtype_Analytics_Admin_Paywall_Chart
         $end_date = date('Y-m-d');
 
         // Batch fetch all data
-        $batched_users = $this->controller->metrics->get_batched_user_data($start_date);
+        $batched_users = $this->controller->users_metrics->get_batched_user_data($start_date);
         $batched_wc = $this->fetch_batched_wc_data($start_date);
         $batched_posthog = $this->fetch_batched_posthog_data($start_date, $end_date);
 

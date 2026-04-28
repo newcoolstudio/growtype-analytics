@@ -52,8 +52,8 @@ class Growtype_Analytics_Admin_Decision_Renderer
     public function render_period_filter($date_from, $date_to, $page_name = 'growtype-analytics')
     {
         // Both active filters and available filters come from the single registry.
-        $active_filters    = Growtype_Analytics_Admin_User_Filters::active_from_request();
-        $available_filters = Growtype_Analytics_Admin_User_Filters::registry();
+        $active_filters    = Growtype_Analytics_Admin_Users_Filters::active_from_request();
+        $available_filters = Growtype_Analytics_Admin_Users_Filters::registry();
         ?>
         <?php /* ── Row 1: Period controls ── */ ?>
         <div class="analytics-filter-toolbar" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -86,7 +86,7 @@ class Growtype_Analytics_Admin_Decision_Renderer
 
 
         <?php /* ── Row 2: Filter pills (opt-in pages only) ── */ ?>
-        <?php if (in_array($page_name, Growtype_Analytics_Admin_User_Filters::FILTER_PAGES, true) && !empty($available_filters)): ?>
+        <?php if (in_array($page_name, Growtype_Analytics_Admin_Users_Filters::FILTER_PAGES, true) && !empty($available_filters)): ?>
         <form id="analytics-filters-form" method="GET" action="<?php echo esc_url(admin_url('admin.php')); ?>"
               style="margin-top:10px; padding-top:10px; border-top:1px solid #f0f0f1;"
               onchange="this.submit()">
@@ -173,7 +173,7 @@ class Growtype_Analytics_Admin_Decision_Renderer
             "Revenue Growth vs Prev Period: " . $growth_sign_revenue . $this->page->format_percent($metrics['revenue_growth_mom']) . ' ($' . number_format_i18n($metrics['revenue_prev'], 2) . ' → $' . number_format_i18n($metrics['revenue'], 2) . ')',
             'New User Growth WoW: ' . $growth_sign_users . $this->page->format_percent($metrics['new_users_growth_wow']) . ' (' . $this->page->format_number($metrics['new_users_prev_7d']) . ' → ' . $this->page->format_number($metrics['new_users_7d']) . ')',
             'LTV Estimate: ' . $this->page->format_money($metrics['ltv_estimate']),
-            'CAC Estimate: ' . $this->page->format_money($metrics['cac_estimate']) . ' (based on $' . number_format_i18n((float)$metrics['settings']['marketing_spend_30d'], 2) . ' spend / ' . $this->page->format_number($this->page->metrics->get_new_buyers_count(30, $metrics['settings'])) . ' new buyers)',
+            'CAC Estimate: ' . $this->page->format_money($metrics['cac_estimate']) . ' (based on $' . number_format_i18n((float)$metrics['settings']['marketing_spend_30d'], 2) . ' spend / ' . $this->page->format_number($this->page->users_metrics->get_new_buyers_count(30, $metrics['settings'])) . ' new buyers)',
             'LTV:CAC Ratio: ' . ($metrics['cac_estimate'] > 0 ? round($metrics['ltv_estimate'] / $metrics['cac_estimate'], 1) . 'x' : 'N/A'),
             "ARPU: " . $this->page->format_money($metrics['arpu']),
             '--- Users ---',

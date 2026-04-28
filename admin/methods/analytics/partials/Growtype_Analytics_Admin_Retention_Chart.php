@@ -89,7 +89,7 @@ class Growtype_Analytics_Admin_Retention_Chart
         $start_date = date('Y-m-d', strtotime("-" . ($days - 1) . " days"));
 
         // Use centralized metrics for new users
-        $batched_users = $this->controller->metrics->get_batched_user_data($start_date);
+        $batched_users = $this->controller->users_metrics->get_batched_user_data($start_date);
 
         // Batch returned users
         $chat_messages_table = $wpdb->prefix . 'growtype_chat_messages';

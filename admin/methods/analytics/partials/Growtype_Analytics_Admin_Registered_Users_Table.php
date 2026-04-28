@@ -93,9 +93,11 @@ class Growtype_Analytics_Admin_Registered_Users_Table
         $days           = $this->page->metrics->get_period_days_count($date_from . ' - ' . $date_to);
         $paged          = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
         $per_page       = 20;
-        $active_filters = Growtype_Analytics_Admin_User_Filters::active_from_request();
+        $active_filters = Growtype_Analytics_Admin_Users_Filters::active_from_request();
+        $orderby        = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'registered';
+        $order          = isset($_GET['order']) && strtoupper($_GET['order']) === 'ASC' ? 'ASC' : 'DESC';
 
-        $results     = $this->page->get_registered_users_list_data($days, $paged, $per_page, $active_filters);
+        $results     = $this->page->get_registered_users_list_data($days, $paged, $per_page, $active_filters, $orderby, $order);
         $users       = $results['items'];
         $total_items = $results['total_items'];
 
@@ -106,7 +108,7 @@ class Growtype_Analytics_Admin_Registered_Users_Table
             <p class="description">
                 <?php printf(__('Total registered users found for this period: %s', 'growtype-analytics'), number_format_i18n($total_items)); ?>
                 <?php
-                $registry = Growtype_Analytics_Admin_User_Filters::registry();
+                $registry = Growtype_Analytics_Admin_Users_Filters::registry();
                 foreach ($active_filters as $f) {
                     $label = isset($registry[$f]) ? ($registry[$f]['icon'] . ' ' . $registry[$f]['label']) : ucwords(str_replace('_', ' ', $f));
                     echo '<span style="display:inline-block; background:#fff3cd; color:#856404; border-radius:4px; padding:1px 8px; font-size:0.85em; font-weight:600; margin-left:6px;">' . esc_html($label) . ' Active</span>';
@@ -143,32 +145,33 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                         <th style="width:32px;">
                             <input type="checkbox" id="ga-select-all" title="<?php esc_attr_e('Select all on this page', 'growtype-analytics'); ?>">
                         </th>
-                        <th><?php _e('ID', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Email', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Registered', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Paid Orders', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Messages', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Regular Chat Visits', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Roleplay Chat Visits', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Roleplays Created', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Quiz Solved', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Offer Shown', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Checkout Page', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Credits Page', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Subscription Modal Shown', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Character Profile Visits', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Roleplay Profile Visits', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Create Character', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Create Roleplay', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Chat Credits', 'growtype-analytics'); ?></th>
-                        <th><?php _e('Emails Sent', 'growtype-analytics'); ?></th>
+                        <?php $this->render_sortable_th('id', __('ID', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('email', __('Email', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('registered', __('Registered', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('paid_orders', __('Paid Orders', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('total_spent', __('Total Spent', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('messages', __('Messages', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('regular_chat_visits', __('Regular Chat Visits', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('roleplay_chat_visits', __('Roleplay Chat Visits', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('roleplays_created', __('Roleplays Created', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('quiz_solved', __('Quiz Solved', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('offer_shown', __('Offer Shown', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('checkout_visited', __('Checkout Page', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('credits_page_visited', __('Credits Page', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('subscription_modal_shown', __('Subscription Modal Shown', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('character_profile_visits', __('Character Profile Visits', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('roleplay_profile_visits', __('Roleplay Profile Visits', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('create_character_visited', __('Create Character', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('create_roleplay_visited', __('Create Roleplay', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('chat_credits', __('Chat Credits', 'growtype-analytics'), $orderby, $order); ?>
+                        <?php $this->render_sortable_th('emails_sent', __('Emails Sent', 'growtype-analytics'), $orderby, $order); ?>
                         <th><?php _e('Actions', 'growtype-analytics'); ?></th>
                     </tr>
                     </thead>
                     <tbody>
                     <?php if (empty($users)): ?>
                         <tr>
-                            <td colspan="20"><?php _e('No data available for this view yet.', 'growtype-analytics'); ?></td>
+                            <td colspan="21"><?php _e('No data available for this view yet.', 'growtype-analytics'); ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($users as $user):
@@ -206,6 +209,9 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                     <?php else: ?>
                                         0
                                     <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php echo $this->page->format_money($user['total_spent'] ?? 0); ?>
                                 </td>
                                 <td><?php echo esc_html($user['message_count']); ?></td>
                                 <td><?php echo (int)($user['regular_chat_visits'] ?? 0); ?></td>
@@ -480,6 +486,27 @@ class Growtype_Analytics_Admin_Registered_Users_Table
             }
         })(jQuery);
         </script>
+        <?php
+    }
+
+    private function render_sortable_th($slug, $label, $current_orderby, $current_order)
+    {
+        $active = $current_orderby === $slug;
+        $next_order = ($active && $current_order === 'DESC') ? 'ASC' : 'DESC';
+        
+        $params = $_GET;
+        $params['orderby'] = $slug;
+        $params['order'] = $next_order;
+        $url = add_query_arg($params, admin_url('admin.php'));
+        
+        $class = 'manage-column sortable ' . ($active ? 'sorted ' . strtolower($current_order) : 'desc');
+        ?>
+        <th scope="col" class="<?php echo esc_attr($class); ?>">
+            <a href="<?php echo esc_url($url); ?>">
+                <span><?php echo esc_html($label); ?></span>
+                <span class="sorting-indicator"></span>
+            </a>
+        </th>
         <?php
     }
 }
