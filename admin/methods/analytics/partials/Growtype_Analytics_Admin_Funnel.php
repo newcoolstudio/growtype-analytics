@@ -32,7 +32,41 @@ class Growtype_Analytics_Admin_Funnel
         return $data;
     }
 
+    /**
+     * Build a deterministic cache key for funnel dropoff metrics.
+     * Encodes all parameters that affect the SQL result.
+     */
+    private function get_funnel_dropoff_cache_key($days, $settings)
+    {
+        $key_data = array(
+            'days'                    => $days,
+            'attempt_statuses'        => $settings['attempt_statuses'],
+            'paid_statuses'           => $settings['paid_statuses'],
+            'activation_min_messages' => $settings['activation_min_messages'],
+            'activation_window_days'  => $settings['activation_window_days'],
+            'excluded_email_patterns' => $settings['excluded_email_patterns'],
+        );
+        return 'gta_funnel_dropoff_' . md5(serialize($key_data));
+    }
+
     public function get_funnel_dropoff_metrics($days, $settings)
+    {
+        $cache_key = $this->get_funnel_dropoff_cache_key($days, $settings);
+        $cached    = get_transient($cache_key);
+
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        $result = $this->compute_funnel_dropoff_metrics($days, $settings);
+
+        // Cache for 5 minutes — analytics data doesn't need to be real-time
+        set_transient($cache_key, $result, 5 * MINUTE_IN_SECONDS);
+
+        return $result;
+    }
+
+    private function compute_funnel_dropoff_metrics($days, $settings)
     {
         global $wpdb;
 
@@ -54,7 +88,7 @@ class Growtype_Analytics_Admin_Funnel
                 COUNT(DISTINCT u.ID) as registered,
                 COUNT(DISTINCT CASE WHEN p_attempt.ID IS NOT NULL THEN u.ID END) as attempts,
                 COUNT(DISTINCT CASE WHEN p_paid.ID IS NOT NULL THEN u.ID END) as paid";
-        
+
         if ($has_chat) {
             $query .= ", COUNT(DISTINCT CASE WHEN active_users.user_id IS NOT NULL THEN u.ID END) as activated";
         } else {
@@ -96,26 +130,25 @@ class Growtype_Analytics_Admin_Funnel
         $metrics = $wpdb->get_row($this->controller->prepare_dynamic_query($query, $params), ARRAY_A);
 
         $registered = (int)($metrics['registered'] ?? 0);
-        $activated = (int)($metrics['activated'] ?? 0);
-        $attempts = (int)($metrics['attempts'] ?? 0);
-        $paid = (int)($metrics['paid'] ?? 0);
+        $activated  = (int)($metrics['activated'] ?? 0);
+        $attempts   = (int)($metrics['attempts'] ?? 0);
+        $paid       = (int)($metrics['paid'] ?? 0);
 
-        $stages = $this->get_funnel_stages($registered, $activated, $attempts, $paid);
-
-        $first = max(1, $registered);
+        $stages  = $this->get_funnel_stages($registered, $activated, $attempts, $paid);
+        $first   = max(1, $registered);
         $previous = null;
-        $rows = array();
+        $rows    = array();
 
         foreach ($stages as $stage) {
-            $count = (int)$stage['count'];
+            $count       = (int)$stage['count'];
             $vs_previous = $previous === null ? 100 : ($previous > 0 ? ($count / $previous) * 100 : 0);
-            $vs_first = ($count / $first) * 100;
+            $vs_first    = ($count / $first) * 100;
 
             $rows[] = array(
-                'label' => $stage['label'],
-                'count' => $this->controller->format_number($count),
+                'label'       => $stage['label'],
+                'count'       => $this->controller->format_number($count),
                 'vs_previous' => $this->controller->format_percent($vs_previous),
-                'vs_first' => $this->controller->format_percent($vs_first),
+                'vs_first'    => $this->controller->format_percent($vs_first),
             );
 
             $previous = $count;
@@ -220,28 +253,59 @@ class Growtype_Analytics_Admin_Funnel
         );
     }
 
+    /**
+     * Build a deterministic cache key for activation metrics.
+     */
+    private function get_activation_metrics_cache_key($period, $settings)
+    {
+        $key_data = array(
+            'period'                  => $period,
+            'activation_min_messages' => $settings['activation_min_messages'],
+            'activation_window_days'  => $settings['activation_window_days'],
+            'excluded_email_patterns' => $settings['excluded_email_patterns'],
+        );
+        return 'gta_activation_metrics_' . md5(serialize($key_data));
+    }
+
     public function get_activation_metrics($period, $settings)
+    {
+        $cache_key = $this->get_activation_metrics_cache_key($period, $settings);
+        $cached    = get_transient($cache_key);
+
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        $result = $this->compute_activation_metrics($period, $settings);
+
+        // Cache for 5 minutes
+        set_transient($cache_key, $result, 5 * MINUTE_IN_SECONDS);
+
+        return $result;
+    }
+
+    private function compute_activation_metrics($period, $settings)
     {
         global $wpdb;
 
-        $period_sql = $this->controller->metrics->build_period_sql('u.user_registered', $period);
+        $period_sql    = $this->controller->metrics->build_period_sql('u.user_registered', $period);
         $period_sql_u2 = $this->controller->metrics->build_period_sql('u2.user_registered', $period);
-        $registered = $this->get_new_users_count($period, $settings);
+        $registered    = $this->get_new_users_count($period, $settings);
 
         if ($registered === 0) {
             return array('registered' => 0, 'activated' => 0, 'rate' => 0);
         }
 
-        $chat_users_table = $wpdb->prefix . 'growtype_chat_users';
+        $chat_users_table    = $wpdb->prefix . 'growtype_chat_users';
         $chat_messages_table = $wpdb->prefix . 'growtype_chat_messages';
 
         if (!$this->controller->table_exists($chat_users_table) || !$this->controller->table_exists($chat_messages_table)) {
             return array('registered' => $registered, 'activated' => 0, 'rate' => 0);
         }
 
-        $email_exclusion = $this->controller->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
+        $email_exclusion         = $this->controller->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
         $activation_min_messages = max(1, (int)$settings['activation_min_messages']);
-        $activation_window_days = max(1, (int)$settings['activation_window_days']);
+        $activation_window_days  = max(1, (int)$settings['activation_window_days']);
 
         $query = "SELECT COUNT(DISTINCT u.ID)
             FROM $wpdb->users u
@@ -264,7 +328,9 @@ class Growtype_Analytics_Admin_Funnel
             $this->controller->prepare_dynamic_query(
                 $query,
                 array_merge(
-                    $period_sql_u2['params'], array((int)$activation_window_days, (int)$activation_min_messages), $period_sql['params'],
+                    $period_sql_u2['params'],
+                    array((int)$activation_window_days, (int)$activation_min_messages),
+                    $period_sql['params'],
                     $email_exclusion['params']
                 )
             )
@@ -272,8 +338,8 @@ class Growtype_Analytics_Admin_Funnel
 
         return array(
             'registered' => $registered,
-            'activated' => $activated,
-            'rate' => $registered > 0 ? round(($activated / $registered) * 100, 2) : 0,
+            'activated'  => $activated,
+            'rate'       => $registered > 0 ? round(($activated / $registered) * 100, 2) : 0,
         );
     }
 }
