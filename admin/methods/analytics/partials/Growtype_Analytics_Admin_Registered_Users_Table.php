@@ -106,7 +106,7 @@ class Growtype_Analytics_Admin_Registered_Users_Table
         ?>
         <div class="analytics-section" style="margin-top:24px;">
             <?php
-            $this->page->controller->decision_renderer->render_section_header(
+            $this->page->decision_renderer->render_section_header(
                 __('Registered Users', 'growtype-analytics'),
                 sprintf(__('Total registered users found for this period: %s', 'growtype-analytics'), number_format_i18n($total_items)),
                 $active_filters,

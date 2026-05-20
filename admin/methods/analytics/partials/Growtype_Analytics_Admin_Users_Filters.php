@@ -51,6 +51,12 @@ class Growtype_Analytics_Admin_Users_Filters
                 'color'  => '#2e7d32',
                 'pages'  => ['growtype-analytics-characters'],
             ],
+            'public_characters' => [
+                'label'  => 'Public',
+                'icon'   => '🌍',
+                'color'  => '#0073aa',
+                'pages'  => ['growtype-analytics-characters'],
+            ],
         ];
     }
 

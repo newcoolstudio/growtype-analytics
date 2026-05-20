@@ -22,8 +22,8 @@ trait Growtype_Analytics_Admin_Page_Reports_Trait
         return $this->reports->get_buyer_cohort_rows($months);
     }
 
-    public function get_top_characters_by_revenue_data($days = 30, $limit = 10, $offset = 0, $orderby = 'revenue', $order = 'desc')
+    public function get_top_characters_by_revenue_data($args = [])
     {
-        return $this->reports->get_top_characters_by_revenue_data($days, $limit, $offset, $orderby, $order);
+        return $this->reports->get_top_characters_by_revenue_data($args);
     }
 }

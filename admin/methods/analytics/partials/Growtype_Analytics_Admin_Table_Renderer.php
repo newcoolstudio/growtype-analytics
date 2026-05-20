@@ -54,11 +54,25 @@ class Growtype_Analytics_Admin_Table_Renderer
                         <td colspan="<?php echo esc_attr(count($headers)); ?>"><?php _e('No data available for this view yet.', 'growtype-analytics'); ?></td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($rows as $row): ?>
+                    <?php 
+                    $allowed_html = array_merge(wp_kses_allowed_html('post'), [
+                        'select' => [
+                            'class' => true,
+                            'data-character-id' => true,
+                            'style' => true,
+                            'name' => true,
+                            'id' => true,
+                        ],
+                        'option' => [
+                            'value' => true,
+                            'selected' => true,
+                        ]
+                    ]);
+                    foreach ($rows as $row): ?>
                         <tr>
                             <?php foreach ($row as $key => $cell): ?>
                                 <?php if ($key === 'total_items_count') continue; ?>
-                                <td><?php echo wp_kses_post($cell); ?></td>
+                                <td><?php echo wp_kses($cell, $allowed_html); ?></td>
                             <?php endforeach; ?>
                         </tr>
                     <?php endforeach; ?>

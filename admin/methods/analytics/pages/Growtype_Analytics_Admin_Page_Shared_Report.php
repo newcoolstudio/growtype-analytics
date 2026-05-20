@@ -194,7 +194,7 @@ class Growtype_Analytics_Admin_Page_Shared_Report
                 break;
 
             case 'top_characters_by_revenue':
-                $data = $this->controller->get_top_characters_by_revenue_data(30, 10);
+                $data = $this->controller->get_top_characters_by_revenue_data(['days' => 30, 'limit' => 10]);
                 break;
 
             case 'buyer_cohorts':
