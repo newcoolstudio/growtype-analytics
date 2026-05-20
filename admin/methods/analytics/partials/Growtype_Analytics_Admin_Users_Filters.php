@@ -13,7 +13,7 @@
 class Growtype_Analytics_Admin_Users_Filters
 {
     /** Pages that show the filter pill strip. Add a slug to opt that page in. */
-    const FILTER_PAGES = ['growtype-analytics-users'];
+    const FILTER_PAGES = ['growtype-analytics-users', 'growtype-analytics-characters'];
 
     public static function registry(): array
     {
@@ -23,6 +23,7 @@ class Growtype_Analytics_Admin_Users_Filters
                 'icon'   => '💳',
                 'color'  => '#0066cc',
                 'having' => 'paid_orders > 0',
+                'pages'  => ['growtype-analytics-users'],
             ],
             // 'has_messages' => [
             //     'label'  => 'Has Messages',
@@ -35,6 +36,20 @@ class Growtype_Analytics_Admin_Users_Filters
                 'icon'   => '🪙',
                 'color'  => '#d63638',
                 'having' => 'chat_credits_amount = 0',
+                'pages'  => ['growtype-analytics-users'],
+            ],
+            'has_characters' => [
+                'label'  => 'Has Characters',
+                'icon'   => '🤖',
+                'color'  => '#2e7d32',
+                'having' => '',
+                'pages'  => ['growtype-analytics-users'],
+            ],
+            'user_created' => [
+                'label'  => 'User Created',
+                'icon'   => '👤',
+                'color'  => '#2e7d32',
+                'pages'  => ['growtype-analytics-characters'],
             ],
         ];
     }

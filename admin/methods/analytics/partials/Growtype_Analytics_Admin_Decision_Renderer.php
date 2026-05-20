@@ -85,61 +85,6 @@ class Growtype_Analytics_Admin_Decision_Renderer
         </div>
 
 
-        <?php /* ── Row 2: Filter pills (opt-in pages only) ── */ ?>
-        <?php if (in_array($page_name, Growtype_Analytics_Admin_Users_Filters::FILTER_PAGES, true) && !empty($available_filters)): ?>
-        <form id="analytics-filters-form" method="GET" action="<?php echo esc_url(admin_url('admin.php')); ?>"
-              style="margin-top:10px; padding-top:10px; border-top:1px solid #f0f0f1;"
-              onchange="this.submit()">
-            <input type="hidden" name="page"      value="<?php echo esc_attr($page_name); ?>">
-            <input type="hidden" name="refresh"   value="1">
-            <input type="hidden" name="date_from" value="<?php echo esc_attr($date_from); ?>">
-            <input type="hidden" name="date_to"   value="<?php echo esc_attr($date_to); ?>">
-
-            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:#646970; letter-spacing:0.06em; white-space:nowrap;">
-                    <?php _e('Filter by', 'growtype-analytics'); ?>
-                </span>
-
-                <?php foreach ($available_filters as $key => $f):
-                    $active = in_array($key, $active_filters, true);
-                    $c      = $f['color'];
-                ?>
-                    <label style="
-                            display:inline-flex; align-items:center; gap:5px;
-                            background:<?php echo $active ? $c : 'transparent'; ?>;
-                            color:<?php echo $active ? '#fff' : $c; ?>;
-                            border:1.5px solid <?php echo $c; ?>;
-                            border-radius:999px; padding:3px 13px;
-                            font-size:12px; font-weight:600;
-                            cursor:pointer; user-select:none; white-space:nowrap;
-                            transition:background .12s, color .12s;
-                        "
-                        onmouseover="if(!this.querySelector('input').checked){ this.style.background='<?php echo $c; ?>22'; }"
-                        onmouseout="if(!this.querySelector('input').checked){ this.style.background='transparent'; }"
-                    >
-                        <input type="checkbox" name="user_filters[]" value="<?php echo esc_attr($key); ?>"
-                               <?php checked($active); ?>
-                               style="position:absolute; opacity:0; width:0; height:0;">
-                        <?php echo esc_html($f['icon'] . ' ' . $f['label']); ?>
-                        <?php if ($active): ?><span style="margin-left:2px; opacity:.75; font-size:10px;">✕</span><?php endif; ?>
-                    </label>
-                <?php endforeach; ?>
-
-                <?php if (!empty($active_filters)): ?>
-                    <a href="<?php echo esc_url(add_query_arg([
-                            'page'      => $page_name,
-                            'date_from' => $date_from,
-                            'date_to'   => $date_to,
-                        ], admin_url('admin.php'))); ?>"
-                       style="font-size:12px; color:#646970; text-decoration:none; opacity:.75; margin-left:4px;">
-                        <?php _e('✕ Clear filters', 'growtype-analytics'); ?>
-                    </a>
-                <?php endif; ?>
-            </div>
-        </form>
-        <?php endif; ?>
-
-
         <script>
             function setAnalyticsPeriod(days) {
                 const to = new Date(), from = new Date();
@@ -158,6 +103,149 @@ class Growtype_Analytics_Admin_Decision_Renderer
         <?php
     }
 
+    /**
+     * Render the standard section header: title + description (left) and optional search form (right).
+     *
+     * @param string      $title         Section heading.
+     * @param string      $description   Description text (already formatted/escaped by caller).
+     * @param array       $active_filters  Currently active filter keys (for badge display).
+     * @param string|null $search_param  GET param name for search input (e.g. 'user_search'). Null = no search form.
+     * @param string      $search_value  Current search value.
+     * @param string      $search_placeholder
+     */
+    public function render_section_header(
+        string $title,
+        string $description = '',
+        array  $active_filters = [],
+        ?string $search_param = null,
+        string  $search_value = '',
+        string  $search_placeholder = ''
+    ): void {
+        $registry    = Growtype_Analytics_Admin_Users_Filters::registry();
+        $search_base = array_diff_key($_GET, array_flip(array_filter([$search_param, 'paged'])));
+        ?>
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+            <div>
+                <h2 style="margin:0 0 4px;"><?php echo esc_html($title); ?></h2>
+                <?php if ($description): ?>
+                    <p class="description" style="margin:0;">
+                        <?php echo $description; ?>
+                        <?php foreach ($active_filters as $f):
+                            $label = isset($registry[$f]) ? ($registry[$f]['icon'] . ' ' . $registry[$f]['label']) : ucwords(str_replace('_', ' ', $f));
+                        ?>
+                            <span style="display:inline-block; background:#fff3cd; color:#856404; border-radius:4px; padding:1px 8px; font-size:0.85em; font-weight:600; margin-left:6px;">
+                                <?php echo esc_html($label); ?> Active
+                            </span>
+                        <?php endforeach; ?>
+                    </p>
+                <?php endif; ?>
+            </div>
+
+            <?php if ($search_param): ?>
+                <form method="get" action="" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0;">
+                    <?php foreach ($search_base as $k => $v): ?>
+                        <?php if (is_array($v)): foreach ($v as $vi): ?>
+                            <input type="hidden" name="<?php echo esc_attr($k); ?>[]" value="<?php echo esc_attr($vi); ?>">
+                        <?php endforeach; else: ?>
+                            <input type="hidden" name="<?php echo esc_attr($k); ?>" value="<?php echo esc_attr($v); ?>">
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                    <input
+                        type="text"
+                        name="<?php echo esc_attr($search_param); ?>"
+                        id="ga-<?php echo esc_attr($search_param); ?>"
+                        value="<?php echo esc_attr($search_value); ?>"
+                        placeholder="<?php echo esc_attr($search_placeholder ?: __('Search…', 'growtype-analytics')); ?>"
+                        style="width:260px; height:30px; padding:0 10px; border:1px solid #8c8f94; border-radius:4px; font-size:13px;"
+                    >
+                    <button type="submit" class="button" style="height:30px; line-height:28px;">🔍 <?php _e('Search', 'growtype-analytics'); ?></button>
+                    <?php if (!empty($search_value)): ?>
+                        <a href="<?php echo esc_url(add_query_arg(array_merge($search_base, ['paged' => 1]), admin_url('admin.php'))); ?>"
+                           class="button" style="height:30px; line-height:28px;">✕ <?php _e('Clear', 'growtype-analytics'); ?></a>
+                    <?php endif; ?>
+                </form>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render filter pills as a standalone section (call this separately, outside the date bar).
+     *
+     * @param string $date_from
+     * @param string $date_to
+     * @param string $page_name
+     * @param array  $extra_filters  Ad-hoc filters injected by the calling page.
+     *                               Same shape as registry: ['key' => ['label'=>'…','icon'=>'…','color'=>'…']]
+     *                               These are merged AFTER registry filters so they always show.
+     */
+    public function render_filter_pills($date_from, $date_to, $page_name, $extra_filters = [])
+    {
+        $active_filters    = Growtype_Analytics_Admin_Users_Filters::active_from_request();
+        $available_filters = Growtype_Analytics_Admin_Users_Filters::registry();
+
+        // Page-scoped registry filters (no 'pages' key = everywhere; 'pages' key = only those pages)
+        $page_filters = array_filter($available_filters, function($f) use ($page_name) {
+            return !isset($f['pages']) || in_array($page_name, $f['pages'], true);
+        });
+
+        // Merge in caller-supplied custom filters (they always show, no pages restriction)
+        $merged_filters = array_merge($page_filters, $extra_filters);
+
+        if (empty($merged_filters)) {
+            return;
+        }
+        ?>
+        <form id="analytics-filters-form" method="GET" action="<?php echo esc_url(admin_url('admin.php')); ?>"
+              style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px;"
+              onchange="this.submit()">
+            <input type="hidden" name="page"      value="<?php echo esc_attr($page_name); ?>">
+            <input type="hidden" name="refresh"   value="1">
+            <input type="hidden" name="date_from" value="<?php echo esc_attr($date_from); ?>">
+            <input type="hidden" name="date_to"   value="<?php echo esc_attr($date_to); ?>">
+
+            <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:#646970; letter-spacing:0.06em; white-space:nowrap;">
+                <?php _e('Filter by', 'growtype-analytics'); ?>
+            </span>
+
+            <?php foreach ($merged_filters as $key => $f):
+                $active = in_array($key, $active_filters, true);
+                $c      = $f['color'];
+            ?>
+                <label style="
+                        display:inline-flex; align-items:center; gap:5px;
+                        background:<?php echo $active ? $c : 'transparent'; ?>;
+                        color:<?php echo $active ? '#fff' : $c; ?>;
+                        border:1.5px solid <?php echo $c; ?>;
+                        border-radius:999px; padding:3px 13px;
+                        font-size:12px; font-weight:600;
+                        cursor:pointer; user-select:none; white-space:nowrap;
+                        transition:background .12s, color .12s;
+                    "
+                    onmouseover="if(!this.querySelector('input').checked){ this.style.background='<?php echo $c; ?>22'; }"
+                    onmouseout="if(!this.querySelector('input').checked){ this.style.background='transparent'; }"
+                >
+                    <input type="checkbox" name="user_filters[]" value="<?php echo esc_attr($key); ?>"
+                           <?php checked($active); ?>
+                           style="position:absolute; opacity:0; width:0; height:0;">
+                    <?php echo esc_html($f['icon'] . ' ' . $f['label']); ?>
+                    <?php if ($active): ?><span style="margin-left:2px; opacity:.75; font-size:10px;">✕</span><?php endif; ?>
+                </label>
+            <?php endforeach; ?>
+
+            <?php if (!empty($active_filters)): ?>
+                <a href="<?php echo esc_url(add_query_arg([
+                        'page'      => $page_name,
+                        'date_from' => $date_from,
+                        'date_to'   => $date_to,
+                    ], admin_url('admin.php'))); ?>"
+                   style="font-size:12px; color:#646970; text-decoration:none; opacity:.75; margin-left:4px;">
+                    <?php _e('✕ Clear filters', 'growtype-analytics'); ?>
+                </a>
+            <?php endif; ?>
+        </form>
+        <?php
+    }
 
     public function render_analytics_snapshot($metrics = null)
     {

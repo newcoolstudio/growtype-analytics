@@ -32,6 +32,8 @@ class Growtype_Analytics_Admin_Page_Users extends Growtype_Analytics_Admin_Base_
         $objective = get_option('growtype_analytics_growth_objective', '10x');
 
         $this->controller->decision_renderer->render_dashboard_filters($date_from, $date_to, $objective, $marketing_spend, 'growtype-analytics-users');
+        
+        $this->controller->decision_renderer->render_filter_pills($date_from, $date_to, 'growtype-analytics-users');
 
         $this->controller->decision_renderer->render_registered_users_table($date_from, $date_to);
 

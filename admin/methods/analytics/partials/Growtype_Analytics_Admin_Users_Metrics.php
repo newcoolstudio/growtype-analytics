@@ -24,7 +24,7 @@ class Growtype_Analytics_Admin_Users_Metrics
     /**
      * Get paginated list of registered users with various stats
      */
-    public function get_registered_users_list($days, $paged = 1, $per_page = 50, $filters = [], $orderby = '', $order = 'DESC')
+    public function get_registered_users_list($days, $paged = 1, $per_page = 50, $filters = [], $orderby = '', $order = 'DESC', $user_search = '')
     {
         global $wpdb;
         $settings = $this->controller->metrics->get_snapshot_settings();
@@ -73,6 +73,15 @@ class Growtype_Analytics_Admin_Users_Metrics
                              AND um_c.meta_key = 'growtype_chat_credits'";
             $where_sql .= " AND (um_c.meta_value IS NULL OR um_c.meta_value = '0')";
             $active_filters = array_diff($active_filters, ['zero_credits']);
+        }
+
+        if (in_array('has_characters', $active_filters, true)) {
+            $join_sql .= " INNER JOIN (
+                SELECT DISTINCT post_author AS user_id
+                FROM {$wpdb->posts}
+                WHERE post_type = 'character' AND post_status = 'publish'
+            ) char_filter ON char_filter.user_id = u.ID";
+            $active_filters = array_diff($active_filters, ['has_characters']);
         }
 
         $having_sql = Growtype_Analytics_Admin_Users_Filters::build_having_sql($active_filters);
@@ -197,11 +206,20 @@ class Growtype_Analytics_Admin_Users_Metrics
             $having_selects .= ", u.user_registered";
         }
 
+        $user_search_sql = '';
+        $user_search_params = [];
+        if (!empty($user_search)) {
+            $like = '%' . $wpdb->esc_like($user_search) . '%';
+            $user_search_sql = " AND (u.user_email LIKE %s OR u.user_login LIKE %s OR u.display_name LIKE %s)";
+            $user_search_params = [$like, $like, $like];
+        }
+
         $from_sql = " FROM {$wpdb->users} u
                      {$join_sql}
                      WHERE 1=1
                      {$period_sql['sql']}
                      {$email_exclusion['sql']}
+                     {$user_search_sql}
                      {$where_sql}";
 
         if (!empty($having_sql) || !empty($having_selects)) {
@@ -215,6 +233,7 @@ class Growtype_Analytics_Admin_Users_Metrics
                 $join_params,
                 $period_sql['params'],
                 $email_exclusion['params'],
+                $user_search_params,
                 [$offset, (int)$per_page]
             );
         } else {
@@ -223,6 +242,7 @@ class Growtype_Analytics_Admin_Users_Metrics
                 $join_params,
                 $period_sql['params'],
                 $email_exclusion['params'],
+                $user_search_params,
                 [$offset, (int)$per_page]
             );
         }
@@ -233,7 +253,8 @@ class Growtype_Analytics_Admin_Users_Metrics
             !empty($having_sql) ? $having_params : [],
             $join_params,
             $period_sql['params'],
-            $email_exclusion['params']
+            $email_exclusion['params'],
+            $user_search_params
         );
 
         if (empty($user_ids)) {

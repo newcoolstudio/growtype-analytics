@@ -96,25 +96,25 @@ class Growtype_Analytics_Admin_Registered_Users_Table
         $active_filters = Growtype_Analytics_Admin_Users_Filters::active_from_request();
         $orderby        = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'registered';
         $order          = isset($_GET['order']) && strtoupper($_GET['order']) === 'ASC' ? 'ASC' : 'DESC';
+        $user_search    = isset($_GET['user_search']) ? sanitize_text_field(trim($_GET['user_search'])) : '';
 
-        $results     = $this->page->get_registered_users_list_data($days, $paged, $per_page, $active_filters, $orderby, $order);
+        $results     = $this->page->get_registered_users_list_data($days, $paged, $per_page, $active_filters, $orderby, $order, $user_search);
         $users       = $results['items'];
         $total_items = $results['total_items'];
 
         $bulk_nonce = wp_create_nonce('growtype_analytics_bulk_actions');
         ?>
         <div class="analytics-section" style="margin-top:24px;">
-            <h2><?php _e('Registered Users', 'growtype-analytics'); ?></h2>
-            <p class="description">
-                <?php printf(__('Total registered users found for this period: %s', 'growtype-analytics'), number_format_i18n($total_items)); ?>
-                <?php
-                $registry = Growtype_Analytics_Admin_Users_Filters::registry();
-                foreach ($active_filters as $f) {
-                    $label = isset($registry[$f]) ? ($registry[$f]['icon'] . ' ' . $registry[$f]['label']) : ucwords(str_replace('_', ' ', $f));
-                    echo '<span style="display:inline-block; background:#fff3cd; color:#856404; border-radius:4px; padding:1px 8px; font-size:0.85em; font-weight:600; margin-left:6px;">' . esc_html($label) . ' Active</span>';
-                }
-                ?>
-            </p>
+            <?php
+            $this->page->controller->decision_renderer->render_section_header(
+                __('Registered Users', 'growtype-analytics'),
+                sprintf(__('Total registered users found for this period: %s', 'growtype-analytics'), number_format_i18n($total_items)),
+                $active_filters,
+                'user_search',
+                $user_search,
+                __('Search by email, username, name…', 'growtype-analytics')
+            );
+            ?>
 
             <?php /* ── Bulk action bar ── */ ?>
             <div id="ga-bulk-bar" style="
