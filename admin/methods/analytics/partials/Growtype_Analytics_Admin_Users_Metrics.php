@@ -294,9 +294,10 @@ class Growtype_Analytics_Admin_Users_Metrics
                 'roleplay_profile_visits' => 0,
                 'create_character_visited' => 0,
                 'create_roleplay_visited' => 0,
-                'emails_sent' => 0,
-                'total_spent' => 0,
+                'emails_sent'              => 0,
+                'total_spent'              => 0,
             ]);
+
         }
 
         $rows = $wpdb->get_results($this->controller->metrics->prepare_dynamic_query(
@@ -405,7 +406,6 @@ class Growtype_Analytics_Admin_Users_Metrics
             }
         }
 
-        $results = [];
         foreach ($user_ids as $uid) {
             if (isset($results_map[(int)$uid])) {
                 $results[] = $results_map[(int)$uid];

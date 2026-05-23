@@ -169,5 +169,11 @@ class Growtype_Analytics_Loader
          */
         require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/api/Growtype_Analytics_Rest_Api.php';
         new Growtype_Analytics_Rest_Api();
+
+        /**
+         * Frontend page: /growtype-analytics/ (admin-only, public URL).
+         */
+        require_once GROWTYPE_ANALYTICS_PATH . 'includes/methods/documentation/Growtype_Analytics_Frontend_Page.php';
+        new Growtype_Analytics_Frontend_Page();
     }
 }

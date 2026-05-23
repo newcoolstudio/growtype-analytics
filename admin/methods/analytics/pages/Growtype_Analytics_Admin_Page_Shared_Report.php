@@ -391,7 +391,7 @@ class Growtype_Analytics_Admin_Page_Shared_Report
             document.addEventListener('DOMContentLoaded', function() {
                 const token = <?php echo json_encode($token); ?>;
                 const refresh = <?php echo $refresh ? 'true' : 'false'; ?>;
-                const baseUrl = <?php echo json_encode(get_rest_url(null, 'growtype-analytics/v1/shared-report/')); ?>;
+                const baseUrl = <?php echo json_encode(get_rest_url(null, 'growtype-analytics/v1/report/metrics/')); ?>;
                 
                 const sections = [
                     'overview', 'execution_kpis', 'payment_failure_segmentation', 'source_attribution', 'traffic_funnel', 

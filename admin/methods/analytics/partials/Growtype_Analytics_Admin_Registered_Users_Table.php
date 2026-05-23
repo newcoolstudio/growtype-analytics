@@ -13,6 +13,11 @@
 class Growtype_Analytics_Admin_Registered_Users_Table
 {
     /**
+     * Lead meta keys excluded from the Marketing column display.
+     */
+    const MARKETING_EXCLUDED_KEYS = ['answers', 'intro'];
+
+    /**
      * @var Growtype_Analytics_Admin_Page
      */
     private $page;
@@ -147,6 +152,7 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                         </th>
                         <?php $this->render_sortable_th('id', __('ID', 'growtype-analytics'), $orderby, $order); ?>
                         <?php $this->render_sortable_th('email', __('Email', 'growtype-analytics'), $orderby, $order); ?>
+                        <th><?php _e('Marketing', 'growtype-analytics'); ?></th>
                         <?php $this->render_sortable_th('registered', __('Registered', 'growtype-analytics'), $orderby, $order); ?>
                         <?php $this->render_sortable_th('paid_orders', __('Paid Orders', 'growtype-analytics'), $orderby, $order); ?>
                         <?php $this->render_sortable_th('total_spent', __('Total Spent', 'growtype-analytics'), $orderby, $order); ?>
@@ -171,7 +177,7 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                     <tbody>
                     <?php if (empty($users)): ?>
                         <tr>
-                            <td colspan="21"><?php _e('No data available for this view yet.', 'growtype-analytics'); ?></td>
+                            <td colspan="22"><?php _e('No data available for this view yet.', 'growtype-analytics'); ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($users as $user):
@@ -200,6 +206,41 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                 </td>
                                 <td><?php echo esc_html($user['ID']); ?></td>
                                 <td><?php echo esc_html($user['user_email']); ?></td>
+                                <td style="min-width:140px;">
+                                    <?php
+                                    $marketing_badges = [];
+                                    if (!empty($lead_post)) {
+                                        $marketing_sources = get_post_meta($lead_post[0], 'growtype_analytics_marketing_sources', true);
+                                        if (!empty($marketing_sources)) {
+                                            $sources = is_array($marketing_sources) ? $marketing_sources : json_decode($marketing_sources, true);
+                                            if (is_array($sources)) {
+                                                $excluded_keys = self::MARKETING_EXCLUDED_KEYS;
+                                                foreach ($sources as $source) {
+                                                    if (isset($source['key'], $source['value']) && $source['value'] !== '' && !in_array($source['key'], $excluded_keys, true)) {
+                                                        $marketing_badges[] = [
+                                                            'key'   => sanitize_text_field($source['key']),
+                                                            'value' => sanitize_text_field($source['value']),
+                                                        ];
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (!empty($marketing_badges)):
+                                        foreach ($marketing_badges as $badge):
+                                            $is_utm = strpos($badge['key'], 'utm_') === 0;
+                                            $bg  = $is_utm ? '#e8f4fd' : '#f3f4f6';
+                                            $col = $is_utm ? '#1565c0' : '#374151';
+                                            echo '<div style="margin-bottom:3px; white-space:nowrap;">';
+                                            echo '<span style="font-size:10px; color:#9e9e9e; margin-right:3px;">' . esc_html($badge['key']) . ':</span>';
+                                            echo '<span style="display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600; background:' . $bg . '; color:' . $col . ';">' . esc_html($badge['value']) . '</span>';
+                                            echo '</div>';
+                                        endforeach;
+                                    else:
+                                        echo '<span style="color:#bbb;">—</span>';
+                                    endif;
+                                    ?>
+                                </td>
                                 <td><?php echo esc_html(wp_date(get_option('date_format') . ' H:i', strtotime($user['user_registered']))); ?></td>
                                 <td>
                                     <?php if ((int)$user['paid_orders'] > 0): ?>
