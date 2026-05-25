@@ -199,6 +199,10 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                             $lead_profile_url = !empty($lead_post)
                                 ? admin_url('post.php?post=' . $lead_post[0] . '&action=edit')
                                 : '';
+                            $events_url = add_query_arg(
+                                ['page' => 'growtype-analytics-events', 'user_email' => $user['user_email']],
+                                admin_url('admin.php')
+                            );
                         ?>
                             <tr>
                                 <td>
@@ -286,15 +290,22 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                 </td>
                                 <td><?php echo (int)($user['chat_credits_amount'] ?? 0); ?></td>
                                 <td><?php echo (int)($user['emails_sent'] ?? 0); ?></td>
-                                <td>
-                                    <a href="<?php echo esc_url($analytics_url); ?>" class="button button-small" target="_blank"><?php _e('Analytics', 'growtype-analytics'); ?></a>
-                                    <a href="<?php echo esc_url($profile_url); ?>" class="button button-small" target="_blank"><?php _e('User', 'growtype-analytics'); ?></a>
-                                    <?php if (!empty($lead_profile_url)): ?>
-                                    <a href="<?php echo esc_url($lead_profile_url); ?>" class="button button-small" target="_blank"><?php _e('Lead', 'growtype-analytics'); ?></a>
-                                    <?php endif; ?>
-                                    <button type="button" class="button button-small ga-copy-user-conv" data-user-id="<?php echo esc_attr($user['ID']); ?>">
-                                        <?php _e('Copy conversations', 'growtype-analytics'); ?>
-                                    </button>
+                                <td style="white-space:nowrap;">
+                                    <div class="ga-actions-dropdown" style="position:relative; display:inline-block;">
+                                        <button type="button" class="button button-small ga-actions-toggle">
+                                            <?php _e('Actions', 'growtype-analytics'); ?> &#9662;
+                                        </button>
+                                        <div class="ga-actions-menu" style="display:none; position:absolute; right:0; top:100%; z-index:9999; background:#fff; border:1px solid #c3c4c7; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,.15); min-width:160px; padding:4px 0;">
+                                            <a href="<?php echo esc_url($analytics_url); ?>" target="_blank" style="display:block; padding:6px 14px; font-size:13px; color:#1d2327; text-decoration:none; white-space:nowrap;" onmouseover="this.style.background='#f0f6fc'" onmouseout="this.style.background=''">📊 <?php _e('Analytics', 'growtype-analytics'); ?></a>
+                                            <a href="<?php echo esc_url($events_url); ?>" target="_blank" style="display:block; padding:6px 14px; font-size:13px; color:#1d2327; text-decoration:none; white-space:nowrap;" onmouseover="this.style.background='#f0f6fc'" onmouseout="this.style.background=''">⚡ <?php _e('Events', 'growtype-analytics'); ?></a>
+                                            <a href="<?php echo esc_url($profile_url); ?>" target="_blank" style="display:block; padding:6px 14px; font-size:13px; color:#1d2327; text-decoration:none; white-space:nowrap;" onmouseover="this.style.background='#f0f6fc'" onmouseout="this.style.background=''">👤 <?php _e('User', 'growtype-analytics'); ?></a>
+                                            <?php if (!empty($lead_profile_url)): ?>
+                                            <a href="<?php echo esc_url($lead_profile_url); ?>" target="_blank" style="display:block; padding:6px 14px; font-size:13px; color:#1d2327; text-decoration:none; white-space:nowrap;" onmouseover="this.style.background='#f0f6fc'" onmouseout="this.style.background=''">📋 <?php _e('Lead', 'growtype-analytics'); ?></a>
+                                            <?php endif; ?>
+                                            <hr style="margin:4px 0; border:none; border-top:1px solid #f0f0f1;">
+                                            <button type="button" class="ga-copy-user-conv" data-user-id="<?php echo esc_attr($user['ID']); ?>" style="display:block; width:100%; text-align:left; padding:6px 14px; font-size:13px; color:#1d2327; background:none; border:none; cursor:pointer; white-space:nowrap;" onmouseover="this.style.background='#f0f6fc'" onmouseout="this.style.background=''">📋 <?php _e('Copy conversations', 'growtype-analytics'); ?></button>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -346,6 +357,19 @@ class Growtype_Analytics_Admin_Registered_Users_Table
         (function($) {
             const nonce   = '<?php echo esc_js($bulk_nonce); ?>';
             const ajaxUrl = '<?php echo esc_js(admin_url('admin-ajax.php')); ?>';
+
+            // ── Actions dropdown toggle ──────────────────────────────────────
+            $(document).on('click', '.ga-actions-toggle', function(e) {
+                e.stopPropagation();
+                const $menu = $(this).siblings('.ga-actions-menu');
+                $('.ga-actions-menu').not($menu).hide();
+                $menu.toggle();
+            });
+            $(document).on('click', function(e) {
+                if (!$(e.target).closest('.ga-actions-dropdown').length) {
+                    $('.ga-actions-menu').hide();
+                }
+            });
 
             // ── Offer Shown popover ──────────────────────────────────────────
             const $popover = $('#ga-offer-popover');

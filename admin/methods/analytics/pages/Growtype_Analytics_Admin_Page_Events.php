@@ -21,24 +21,51 @@ class Growtype_Analytics_Admin_Page_Events extends Growtype_Analytics_Admin_Base
     {
         $this->render_page_header(__('Live Tracking Events', 'growtype-analytics'));
 
-        $date_from = isset($_GET['date_from']) ? sanitize_text_field($_GET['date_from']) : date('Y-m-d', strtotime('-30 days'));
-        $date_to = isset($_GET['date_to']) ? sanitize_text_field($_GET['date_to']) : date('Y-m-d');
-        
+        // Validate date format — strip anything that isn't a valid YYYY-MM-DD date
+        $date_from_raw = isset($_GET['date_from']) ? sanitize_text_field(wp_unslash($_GET['date_from'])) : '';
+        $date_to_raw   = isset($_GET['date_to'])   ? sanitize_text_field(wp_unslash($_GET['date_to']))   : '';
+        $date_from = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from_raw) && strtotime($date_from_raw)) ? $date_from_raw : date('Y-m-d', strtotime('-30 days'));
+        $date_to   = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_to_raw)   && strtotime($date_to_raw))   ? $date_to_raw   : date('Y-m-d');
+
         $snapshot_settings = $this->controller->get_snapshot_settings();
         $objective = $snapshot_settings['growth_objective'] ?? '10x';
         $marketing_spend = $snapshot_settings['marketing_spend'] ?? 0;
 
         $this->controller->decision_renderer->render_dashboard_filters($date_from, $date_to, $objective, $marketing_spend, $this->get_menu_slug());
 
+        // User email filter — resolved to user_id for the DB query
+        // If the email is supplied but no WP user exists, use -1 so the query returns 0 rows
+        // (user_id = 0 means "no filter" in get_paginated_events, do not fall back to that)
+        $filter_email = isset($_GET['user_email']) ? sanitize_email(wp_unslash($_GET['user_email'])) : '';
+        $filter_user_id = 0;  // 0 = no filter
+        $filter_user = null;
+        if (!empty($filter_email)) {
+            $filter_user = get_user_by('email', $filter_email);
+            $filter_user_id = $filter_user ? (int)$filter_user->ID : -1; // -1 = email given but unknown
+        }
+
         $paged = isset($_GET['paged']) ? max(1, (int)$_GET['paged']) : 1;
         $per_page = Growtype_Analytics_Admin_Table_Renderer::DEFAULT_PER_PAGE;
         $offset = ($paged - 1) * $per_page;
 
-        $paginated_data = Growtype_Analytics_Database::get_paginated_events($date_from, $date_to, $per_page, $offset);
+        $paginated_data = Growtype_Analytics_Database::get_paginated_events($date_from, $date_to, $per_page, $offset, $filter_user_id);
         $total_events = $paginated_data['total'];
         $events = $paginated_data['events'];
-
         ?>
+
+        <?php if (!empty($filter_email)): ?>
+        <div class="notice notice-info" style="margin:10px 0; display:flex; align-items:center; justify-content:space-between;">
+            <p style="margin:0;">
+                <?php if ($filter_user): ?>
+                    <?php printf(__('Showing events for: <strong>%s</strong> (User #%d)', 'growtype-analytics'), esc_html($filter_user->user_email), $filter_user_id); ?>
+                <?php else: ?>
+                    <?php printf(__('No user found with email: <strong>%s</strong>', 'growtype-analytics'), esc_html($filter_email)); ?>
+                <?php endif; ?>
+            </p>
+            <a href="<?php echo esc_url(remove_query_arg('user_email')); ?>" class="button button-small" style="margin-left:16px; flex-shrink:0;"><?php _e('Clear filter', 'growtype-analytics'); ?></a>
+        </div>
+        <?php endif; ?>
+
         <div class="analytics-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <div>
@@ -83,11 +110,11 @@ class Growtype_Analytics_Admin_Page_Events extends Growtype_Analytics_Admin_Base
                 }
 
                 $rows[] = array(
-                    'timestamp' => esc_html($event['created_at']),
+                    'timestamp'  => esc_html($event['created_at']),
                     'event_type' => '<span class="status-badge" style="background: #f0f0f1; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 11px; text-transform: uppercase;">' . esc_html($event['event_type']) . '</span>',
-                    'object' => $object_html,
-                    'user' => $user_html,
-                    'metadata' => $metadata_html
+                    'object'     => $object_html,
+                    'user'       => $user_html,
+                    'metadata'   => $metadata_html
                 );
             }
 

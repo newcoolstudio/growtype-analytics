@@ -361,6 +361,15 @@ class Growtype_Analytics_Admin_Page
                     $date_to
                 );
                 break;
+            case 'source_attribution':
+                $page = $this->get_page_by_class('Growtype_Analytics_Admin_Page_Source_Attribution');
+                if ($page) {
+                    $orderby = sanitize_text_field($_POST['orderby'] ?? 'score');
+                    $order = sanitize_text_field($_POST['order'] ?? 'DESC');
+                    $paged = max(1, (int)($_POST['paged'] ?? 1));
+                    $page->render_table_only($date_from, $date_to, $orderby, $order, $paged);
+                }
+                break;
             case 'posthog_insights':
                 $this->posthog->render_posthog_insights($date_from, $date_to);
                 break;

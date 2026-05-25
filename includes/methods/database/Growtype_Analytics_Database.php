@@ -354,25 +354,28 @@ class Growtype_Analytics_Database
     /**
      * Get paginated events for a specific date range
      */
-    public static function get_paginated_events($date_from, $date_to, $per_page, $offset)
+    public static function get_paginated_events($date_from, $date_to, $per_page, $offset, $user_id = 0)
     {
         global $wpdb;
         $table_name = $wpdb->prefix . self::TABLE_NAME;
 
+        $user_where = '';
+        $user_args  = [];
+        if ($user_id !== 0) {
+            $user_where = ' AND user_id = %d';
+            $user_args[] = $user_id;
+        }
+
         $total_events = (int)$wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM $table_name WHERE created_at >= %s AND created_at <= %s",
-            $date_from . ' 00:00:00',
-            $date_to . ' 23:59:59'
+            "SELECT COUNT(*) FROM $table_name WHERE created_at >= %s AND created_at <= %s" . $user_where,
+            array_merge([$date_from . ' 00:00:00', $date_to . ' 23:59:59'], $user_args)
         ));
 
         $events = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM $table_name 
-             WHERE created_at >= %s AND created_at <= %s
+             WHERE created_at >= %s AND created_at <= %s" . $user_where . "
              ORDER BY created_at DESC LIMIT %d OFFSET %d",
-            $date_from . ' 00:00:00',
-            $date_to . ' 23:59:59',
-            $per_page,
-            $offset
+            array_merge([$date_from . ' 00:00:00', $date_to . ' 23:59:59'], $user_args, [$per_page, $offset])
         ), ARRAY_A);
 
         return array(

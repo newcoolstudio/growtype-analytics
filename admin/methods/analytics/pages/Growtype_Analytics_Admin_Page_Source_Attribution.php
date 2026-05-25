@@ -191,7 +191,42 @@ class Growtype_Analytics_Admin_Page_Source_Attribution extends Growtype_Analytic
 
         $results = $wpdb->get_results($this->controller->prepare_dynamic_query($query, $query_params), ARRAY_A);
 
-        return array_map(function ($row) use ($affiliate_utm_map, $affiliate_code_map) {
+        // Fetch PostHog sources — both UTM and referrer-based (social/organic won't have UTM params)
+        $skip_labels = ['$$_posthog_breakdown_other_$$', '$$_posthog_breakdown_null_$$', 'Unknown', '$none', 'null'];
+        $posthog_map = [];
+
+        // 1. UTM source (explicitly tagged links)
+        $posthog_utm = $this->controller->posthog->get_demographics_breakdown('utm_source', 'event', $days);
+        if (!empty($posthog_utm)) {
+            foreach ($posthog_utm as $item) {
+                $label = strtolower(trim($item['label']));
+                if ($item['label'] && !in_array($item['label'], $skip_labels)) {
+                    $posthog_map[$label] = ($posthog_map[$label] ?? 0) + $item['count'];
+                }
+            }
+        }
+
+        // 2. Referring domain — catches organic social (instagram.com, t.co, facebook.com, etc.)
+        $posthog_ref = $this->controller->posthog->get_demographics_breakdown('$initial_referring_domain', 'event', $days);
+        if (!empty($posthog_ref)) {
+            foreach ($posthog_ref as $item) {
+                $raw = strtolower(trim($item['label']));
+                if (!$item['label'] || in_array($item['label'], $skip_labels) || $raw === '') {
+                    continue;
+                }
+                // Normalize: strip www. and known mobile prefixes (l.instagram.com → instagram.com)
+                $normalized = preg_replace('/^(www\.|l\.|m\.)/i', '', $raw);
+                // Only add if not already present from UTM (UTM is more specific, don't double-count)
+                if (!isset($posthog_map[$raw]) && !isset($posthog_map[$normalized])) {
+                    $posthog_map[$normalized] = ($posthog_map[$normalized] ?? 0) + $item['count'];
+                } elseif (isset($posthog_map[$normalized])) {
+                    // Merge into the normalized key
+                    $posthog_map[$normalized] += $item['count'];
+                }
+            }
+        }
+
+        $mapped_results = array_map(function ($row) use ($affiliate_utm_map, $affiliate_code_map, &$posthog_map) {
             $paid_orders = (int)$row['paid_orders'];
             $attempts = (int)$row['attempts'];
             $registrations = (int)$row['registrations'];
@@ -200,7 +235,7 @@ class Growtype_Analytics_Admin_Page_Source_Attribution extends Growtype_Analytic
             $score = (float)$row['score'];
             $revenue = (float)($row['revenue'] ?: 0);
             $source_type = $row['source_type'];
-            $source = strtolower($row['source']);
+            $source = strtolower(trim($row['source']));
             
             // Resolve Product ID hints
             if ($source_type === 'ga_payment_product_id_hint' && is_numeric($source)) {
@@ -239,11 +274,21 @@ class Growtype_Analytics_Admin_Page_Source_Attribution extends Growtype_Analytic
                 );
             }
 
+            // Extract PostHog count — try exact match first, then normalized domain (strips www./l./m.)
+            $ph_visitors = 0;
+            $source_normalized = preg_replace('/^(www\.|l\.|m\.)/i', '', $source);
+            $ph_key = isset($posthog_map[$source]) ? $source : (isset($posthog_map[$source_normalized]) ? $source_normalized : null);
+            if ($ph_key !== null) {
+                $ph_visitors = $posthog_map[$ph_key];
+                unset($posthog_map[$ph_key]);
+            }
+
             return array(
                 'source_type' => $display_source_type,
                 'source' => $source,
                 'campaign' => $row['campaign'],
                 'is_affiliate' => $affiliate_html,
+                'ph_visitors' => $this->controller->format_number($ph_visitors),
                 'registrations' => $this->controller->format_number($registrations),
                 'engaged_users' => $this->controller->format_number($engaged_users),
                 'paywall_users' => $this->controller->format_number($paywall_users),
@@ -256,6 +301,8 @@ class Growtype_Analytics_Admin_Page_Source_Attribution extends Growtype_Analytic
                 'total_items_count' => (int)($row['total_items_count'] ?? 0)
             );
         }, $results ?: array());
+
+        return $mapped_results;
     }
 
     public function get_page_title()
@@ -279,7 +326,6 @@ class Growtype_Analytics_Admin_Page_Source_Attribution extends Growtype_Analytic
 
         $date_from = isset($_GET['date_from']) ? sanitize_text_field(wp_unslash($_GET['date_from'])) : date('Y-m-d', strtotime('-30 days'));
         $date_to = isset($_GET['date_to']) ? sanitize_text_field(wp_unslash($_GET['date_to'])) : date('Y-m-d');
-        $days = max(1, (int)((strtotime($date_to) - strtotime($date_from)) / 86400));
         
         $snapshot_settings = $this->controller->get_snapshot_settings();
         $objective = $snapshot_settings['growth_objective'] ?? '10x';
@@ -288,10 +334,54 @@ class Growtype_Analytics_Admin_Page_Source_Attribution extends Growtype_Analytic
         $this->controller->decision_renderer->render_dashboard_filters($date_from, $date_to, $objective, $marketing_spend, $this->get_menu_slug());
 
         $paged = isset($_GET['paged']) ? max(1, (int)$_GET['paged']) : 1;
-        $per_page = Growtype_Analytics_Admin_Table_Renderer::DEFAULT_PER_PAGE;
-        $offset = ($paged - 1) * $per_page;
         $orderby = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'score';
         $order = isset($_GET['order']) ? sanitize_text_field($_GET['order']) : 'DESC';
+
+        ?>
+        <div class="analytics-section">
+            <h2><?php _e('Revenue By Source', 'growtype-analytics'); ?></h2>
+            <p class="description"><?php _e('Shows which traffic sources and campaigns create registrations, paid orders, attempts, and revenue.', 'growtype-analytics'); ?></p>
+            
+            <div id="source-attribution-container" style="min-height: 200px; position: relative;">
+                <div class="growtype-analytics-loading-overlay" style="display: flex; justify-content: center; align-items: center; padding: 40px; background: rgba(255,255,255,0.8); z-index: 10;">
+                    <div class="spinner is-active" style="float: none; margin: 0;"></div>
+                    <span style="margin-left: 10px;"><?php _e('Loading attribution data... This may take a moment for large datasets.', 'growtype-analytics'); ?></span>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            $.post(ajaxurl, {
+                action: 'growtype_analytics_load_section',
+                nonce: '<?php echo wp_create_nonce('growtype_analytics_nonce'); ?>',
+                section: 'source_attribution',
+                date_from: '<?php echo esc_js($date_from); ?>',
+                date_to: '<?php echo esc_js($date_to); ?>',
+                orderby: '<?php echo esc_js($orderby); ?>',
+                order: '<?php echo esc_js($order); ?>',
+                paged: <?php echo (int)$paged; ?>
+            }, function(response) {
+                if (response.success && response.data.html) {
+                    $('#source-attribution-container').html(response.data.html);
+                } else {
+                    $('#source-attribution-container').html('<div class="notice notice-error inline"><p>Failed to load data. Please try refreshing.</p></div>');
+                }
+            }).fail(function() {
+                $('#source-attribution-container').html('<div class="notice notice-error inline"><p>Server error while loading data.</p></div>');
+            });
+        });
+        </script>
+        <?php
+        
+        $this->render_page_footer();
+    }
+
+    public function render_table_only($date_from, $date_to, $orderby = 'score', $order = 'DESC', $paged = 1)
+    {
+        $days = max(1, (int)((strtotime($date_to) - strtotime($date_from)) / 86400));
+        $per_page = Growtype_Analytics_Admin_Table_Renderer::DEFAULT_PER_PAGE;
+        $offset = ($paged - 1) * $per_page;
 
         $attribution_data = $this->get_source_attribution_rows($days, $per_page, $offset, $orderby, $order);
         $total_items = !empty($attribution_data) ? $attribution_data[0]['total_items_count'] : 0;
@@ -300,46 +390,39 @@ class Growtype_Analytics_Admin_Page_Source_Attribution extends Growtype_Analytic
         $render_sortable_header = function($label, $key) use ($orderby, $order, $date_from, $date_to) {
             $new_order = ($orderby === $key && $order === 'DESC') ? 'ASC' : 'DESC';
             $url = add_query_arg(array(
+                'page' => 'growtype-analytics-source-attribution',
                 'orderby' => $key,
                 'order' => $new_order,
                 'date_from' => $date_from,
                 'date_to' => $date_to,
-            ), $_SERVER['REQUEST_URI']);
+            ), admin_url('admin.php'));
             $icon = $orderby === $key ? ($order === 'DESC' ? ' &darr;' : ' &uarr;') : '';
             return '<a href="' . esc_url($url) . '">' . esc_html($label) . $icon . '</a>';
         };
 
-        ?>
-        <div class="analytics-section">
-            <h2><?php _e('Revenue By Source', 'growtype-analytics'); ?></h2>
-            <p class="description"><?php _e('Shows which traffic sources and campaigns create registrations, paid orders, attempts, and revenue.', 'growtype-analytics'); ?></p>
-            <?php
-            $headers = array(
-                __('Source Type', 'growtype-analytics'),
-                __('Source', 'growtype-analytics'),
-                __('Campaign', 'growtype-analytics'),
-                __('Affiliate', 'growtype-analytics'),
-                $render_sortable_header(__('Registrations', 'growtype-analytics'), 'registrations'),
-                $render_sortable_header(__('Engaged (3+)', 'growtype-analytics'), 'engaged_users'),
-                $render_sortable_header(__('Saw Paywall', 'growtype-analytics'), 'paywall_users'),
-                $render_sortable_header(__('Paid Orders', 'growtype-analytics'), 'paid_orders'),
-                $render_sortable_header(__('Attempts', 'growtype-analytics'), 'attempts'),
-                $render_sortable_header(__('Success Rate', 'growtype-analytics'), 'success_rate'),
-                $render_sortable_header(__('Revenue', 'growtype-analytics'), 'revenue'),
-                $render_sortable_header(__('Score', 'growtype-analytics'), 'score'),
-                __('AOV', 'growtype-analytics')
-            );
+        $headers = array(
+            __('Source Type', 'growtype-analytics'),
+            __('Source', 'growtype-analytics'),
+            __('Campaign', 'growtype-analytics'),
+            __('Affiliate', 'growtype-analytics'),
+            __('PostHog Views', 'growtype-analytics'),
+            $render_sortable_header(__('Registrations', 'growtype-analytics'), 'registrations'),
+            $render_sortable_header(__('Engaged (3+)', 'growtype-analytics'), 'engaged_users'),
+            $render_sortable_header(__('Saw Paywall', 'growtype-analytics'), 'paywall_users'),
+            $render_sortable_header(__('Paid Orders', 'growtype-analytics'), 'paid_orders'),
+            $render_sortable_header(__('Attempts', 'growtype-analytics'), 'attempts'),
+            $render_sortable_header(__('Success Rate', 'growtype-analytics'), 'success_rate'),
+            $render_sortable_header(__('Revenue', 'growtype-analytics'), 'revenue'),
+            $render_sortable_header(__('Score', 'growtype-analytics'), 'score'),
+            __('AOV', 'growtype-analytics')
+        );
 
-            $this->controller->table_renderer->render(
-                $headers,
-                $attribution_data,
-                $total_items,
-                $per_page,
-                $paged
-            );
-            ?>
-        </div>
-        <?php
-        $this->render_page_footer();
+        $this->controller->table_renderer->render(
+            $headers,
+            $attribution_data,
+            $total_items,
+            $per_page,
+            $paged
+        );
     }
 }
