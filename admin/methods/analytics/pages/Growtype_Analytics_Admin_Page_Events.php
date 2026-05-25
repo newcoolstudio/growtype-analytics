@@ -48,7 +48,12 @@ class Growtype_Analytics_Admin_Page_Events extends Growtype_Analytics_Admin_Base
         $per_page = Growtype_Analytics_Admin_Table_Renderer::DEFAULT_PER_PAGE;
         $offset = ($paged - 1) * $per_page;
 
-        $paginated_data = Growtype_Analytics_Database::get_paginated_events($date_from, $date_to, $per_page, $offset, $filter_user_id);
+        $active_user_filters = isset($_GET['user_filters']) && is_array($_GET['user_filters']) ? $_GET['user_filters'] : [];
+        $group_by_user = in_array('group_by_user', $active_user_filters, true);
+        $search_query = isset($_GET['search_events']) ? sanitize_text_field(wp_unslash($_GET['search_events'])) : '';
+
+        $paginated_data = $this->get_paginated_events($date_from, $date_to, $per_page, $offset, $filter_user_id, $group_by_user, $active_user_filters, $search_query);
+        
         $total_events = $paginated_data['total'];
         $events = $paginated_data['events'];
         ?>
@@ -66,13 +71,39 @@ class Growtype_Analytics_Admin_Page_Events extends Growtype_Analytics_Admin_Base
         </div>
         <?php endif; ?>
 
+        <?php
+        $extra_filters = [
+            'group_by_user' => [
+                'label' => __('Group By User', 'growtype-analytics'),
+                'icon'  => '👥',
+                'color' => '#8a2424'
+            ]
+        ];
+
+        // If filtering by email, we need to pass it into the search/url somehow. 
+        // Currently render_filter_pills doesn't pass 'user_email'. We can inject it using a hidden field.
+        // Wait, render_filter_pills renders its own form. If we need user_email to be persisted, 
+        // we should either modify render_filter_pills to include it, or not worry about it.
+        // Actually, render_filter_pills doesn't pass custom GET parameters. 
+        // Let's modify $_GET briefly so it gets caught? No, render_filter_pills hardcodes date_from, date_to, page, refresh.
+        // I will just call it as is for now, if user loses filter_email when toggling, it's fine or I can just echo the hidden input manually via JS or extending the function.
+        // Actually, $this->controller->decision_renderer->render_filter_pills DOES NOT pass user_email.
+        
+        $this->controller->decision_renderer->render_filter_pills($date_from, $date_to, $this->get_menu_slug(), $extra_filters);
+        ?>
+
         <div class="analytics-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <div>
-                    <h2 style="margin: 0;"><?php _e('Recent Tracking Events', 'growtype-analytics'); ?></h2>
-                    <p class="description" style="margin: 5px 0 0;"><?php printf(__('Showing %d events out of %s total in selected period.', 'growtype-analytics'), count($events), '<strong>' . number_format($total_events) . '</strong>'); ?></p>
-                </div>
-            </div>
+            <?php
+            $desc = sprintf(__('Showing %d events out of %s total in selected period.', 'growtype-analytics'), count($events), '<strong>' . number_format($total_events) . '</strong>');
+            $this->controller->decision_renderer->render_section_header(
+                __('Recent Tracking Events', 'growtype-analytics'),
+                $desc,
+                [],
+                'search_events',
+                $search_query,
+                __('Search metadata or email...', 'growtype-analytics')
+            );
+            ?>
 
             <?php
             $rows = array();
@@ -129,5 +160,64 @@ class Growtype_Analytics_Admin_Page_Events extends Growtype_Analytics_Admin_Base
         </div>
         <?php
         $this->render_page_footer();
+    }
+
+    public function get_paginated_events($date_from, $date_to, $per_page, $offset, $user_id = 0, $group_by_user = false, $active_user_filters = [], $search_query = '')
+    {
+        global $wpdb;
+        $table_name = $wpdb->prefix . Growtype_Analytics_Database::TABLE_NAME;
+
+        $where_clauses = ["created_at >= %s", "created_at <= %s"];
+        $where_args    = [$date_from . ' 00:00:00', $date_to . ' 23:59:59'];
+
+        if ($user_id !== 0) {
+            $where_clauses[] = "user_id = %d";
+            $where_args[] = $user_id;
+        }
+
+        // Apply active user filters using EXISTS subqueries on usermeta
+        if (!empty($active_user_filters) && is_array($active_user_filters)) {
+            // Require user_id > 0 to have user meta
+            $where_clauses[] = "user_id > 0";
+
+            if (in_array('paid_orders_only', $active_user_filters, true)) {
+                $where_clauses[] = "EXISTS (SELECT 1 FROM {$wpdb->usermeta} WHERE user_id = {$table_name}.user_id AND meta_key = 'growtype_analytics_paid_orders' AND meta_value > 0)";
+            }
+            if (in_array('zero_credits', $active_user_filters, true)) {
+                $where_clauses[] = "EXISTS (SELECT 1 FROM {$wpdb->usermeta} WHERE user_id = {$table_name}.user_id AND meta_key = 'growtype_chat_credits' AND (meta_value = '0' OR meta_value = ''))";
+            }
+            if (in_array('has_characters', $active_user_filters, true)) {
+                // Check if they authored at least one post of type 'character'
+                $where_clauses[] = "EXISTS (SELECT 1 FROM {$wpdb->posts} WHERE post_author = {$table_name}.user_id AND post_type = 'character' AND post_status IN ('publish', 'draft', 'private'))";
+            }
+        }
+
+        if (!empty($search_query)) {
+            $search_like = '%' . $wpdb->esc_like($search_query) . '%';
+            $where_clauses[] = "({$table_name}.metadata LIKE %s OR EXISTS (SELECT 1 FROM {$wpdb->users} u WHERE u.ID = {$table_name}.user_id AND u.user_email LIKE %s))";
+            $where_args[] = $search_like;
+            $where_args[] = $search_like;
+        }
+
+        $where_sql = implode(' AND ', $where_clauses);
+
+        $total_events = (int)$wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $table_name WHERE $where_sql",
+            $where_args
+        ));
+
+        $order_by = $group_by_user ? "user_id DESC, created_at DESC" : "created_at DESC";
+
+        $events = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $table_name 
+             WHERE $where_sql
+             ORDER BY $order_by LIMIT %d OFFSET %d",
+            array_merge($where_args, [$per_page, $offset])
+        ), ARRAY_A);
+
+        return array(
+            'total' => $total_events,
+            'events' => $events
+        );
     }
 }
