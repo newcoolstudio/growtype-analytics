@@ -492,4 +492,20 @@
         });
     };
 
+    // Initialize toggle behavior
+    $(document).ready(function() {
+        $(document).on('click', '.posthog-toggle', function() {
+            var $content = $(this).next('.posthog-content');
+            var $indicator = $(this).find('.posthog-toggle-indicator');
+            
+            $content.slideToggle('fast', function() {
+                if ($content.is(':visible')) {
+                    $indicator.removeClass('dashicons-arrow-down').addClass('dashicons-arrow-up');
+                } else {
+                    $indicator.removeClass('dashicons-arrow-up').addClass('dashicons-arrow-down');
+                }
+            });
+        });
+    });
+
 })(jQuery);

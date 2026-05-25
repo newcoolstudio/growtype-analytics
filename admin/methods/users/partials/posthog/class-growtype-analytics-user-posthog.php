@@ -110,8 +110,33 @@ class Growtype_Analytics_User_PostHog
             }
         }
 
-        // Analyze drop-off points
-        $dropoff = $this->analyze_dropoff($events);
+        $person_props = $person_data[0]['properties'] ?? array();
+
+        // Fallback: Location and Device from the most recent event if not in person properties
+        if (!empty($events)) {
+            $latest_event_props = $events[0]['properties'] ?? array();
+            
+            if (empty($person_props['$geoip_country_name']) && !empty($latest_event_props['$geoip_country_name'])) {
+                $person_props['$geoip_country_name'] = $latest_event_props['$geoip_country_name'];
+            }
+            if (empty($person_props['$geoip_city_name']) && !empty($latest_event_props['$geoip_city_name'])) {
+                $person_props['$geoip_city_name'] = $latest_event_props['$geoip_city_name'];
+            }
+            if (empty($person_props['$device']) && !empty($latest_event_props['$device_type'])) {
+                $person_props['$device'] = $latest_event_props['$device_type'];
+            } elseif (empty($person_props['$device']) && !empty($latest_event_props['$device'])) {
+                $person_props['$device'] = $latest_event_props['$device'];
+            }
+            if (empty($person_props['$browser']) && !empty($latest_event_props['$browser'])) {
+                $person_props['$browser'] = $latest_event_props['$browser'];
+            }
+            if (empty($person_props['$os']) && !empty($latest_event_props['$os'])) {
+                $person_props['$os'] = $latest_event_props['$os'];
+            }
+        }
+
+        // Analyze drop-off points (user is registered since we are on their profile)
+        $dropoff = $this->analyze_dropoff($events, true);
 
         // Build user journey
         $journey = $this->build_journey($events);
@@ -121,7 +146,7 @@ class Growtype_Analytics_User_PostHog
 
         return array (
             'events' => $events,
-            'properties' => $person_data[0]['properties'] ?? array (),
+            'properties' => $person_props,
             'sessions' => array (
                 'total_events' => count($events),
                 'last_seen' => $person_data[0]['created_at'] ?? null
@@ -379,7 +404,7 @@ class Growtype_Analytics_User_PostHog
     /**
      * Analyze drop-off points from events
      */
-    private function analyze_dropoff($events)
+    private function analyze_dropoff($events, $is_registered = false)
     {
         if (empty($events)) {
             return array (
@@ -394,7 +419,7 @@ class Growtype_Analytics_User_PostHog
         }, $events);
 
         // Check for common drop-off patterns
-        $has_registration = in_array('growtype_analytics_wp_user_registered', $event_names);
+        $has_registration = $is_registered || in_array('growtype_analytics_wp_user_registered', $event_names);
         $has_pageview = in_array('$pageview', $event_names);
         $event_count = count($events);
 
@@ -485,62 +510,95 @@ class Growtype_Analytics_User_PostHog
         $this->enqueue_assets();
 
         ?>
+        <style>
+            .posthog-toggle {
+                cursor: pointer;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: #fff;
+                border: 1px solid #c3c4c7;
+                padding: 10px 15px;
+                margin-top: 20px;
+                margin-bottom: 0;
+                box-shadow: 0 1px 1px rgba(0,0,0,.04);
+                font-size: 14px;
+                font-weight: 600;
+                transition: background-color 0.15s ease-in-out;
+            }
+            .posthog-toggle:hover {
+                background: #f6f7f7;
+            }
+            .posthog-content {
+                background: #fff;
+                border: 1px solid #c3c4c7;
+                border-top: none;
+                padding: 15px;
+                box-shadow: 0 1px 1px rgba(0,0,0,.04);
+            }
+        </style>
+
         <div class="analytics-section">
-            <h2><?php _e('PostHog Analytics', 'growtype-analytics'); ?></h2>
+            <h2 class="posthog-toggle">
+                <span><?php _e('PostHog Analytics', 'growtype-analytics'); ?></span>
+                <span class="dashicons dashicons-arrow-down posthog-toggle-indicator"></span>
+            </h2>
 
-            <div id="posthog-loading" class="notice notice-info">
-                <p><?php _e('Loading analytics data...', 'growtype-analytics'); ?></p>
-            </div>
+            <div class="posthog-content" style="display: none;">
+                <div id="posthog-loading" class="notice notice-info">
+                    <p><?php _e('Loading analytics data...', 'growtype-analytics'); ?></p>
+                </div>
 
-            <div id="posthog-error" class="notice notice-error" style="display: none;">
-                <p></p>
-            </div>
+                <div id="posthog-error" class="notice notice-error" style="display: none;">
+                    <p></p>
+                </div>
 
-            <div id="posthog-data" style="display: none;">
-                <!-- Summary Overview -->
-                <div id="posthog-summary"></div>
+                <div id="posthog-data" style="display: none;">
+                    <!-- Summary Overview -->
+                    <div id="posthog-summary"></div>
 
-                <div class="analytics-grid">
-                    <!-- Session Recordings Section -->
-                    <div class="analytics-card recordings">
-                        <h3><?php _e('Session Recordings', 'growtype-analytics'); ?></h3>
-                        <div id="posthog-recordings"></div>
-                    </div>
+                    <div class="analytics-grid">
+                        <!-- Session Recordings Section -->
+                        <div class="analytics-card recordings">
+                            <h3><?php _e('Session Recordings', 'growtype-analytics'); ?></h3>
+                            <div id="posthog-recordings"></div>
+                        </div>
 
-                    <!-- Conversion Insights Section -->
-                    <div class="analytics-card conversion-insights">
-                        <h3><?php _e('Conversion Insights', 'growtype-analytics'); ?></h3>
-                        <div id="posthog-conversion-insights"></div>
-                    </div>
+                        <!-- Conversion Insights Section -->
+                        <div class="analytics-card conversion-insights">
+                            <h3><?php _e('Conversion Insights', 'growtype-analytics'); ?></h3>
+                            <div id="posthog-conversion-insights"></div>
+                        </div>
 
-                    <!-- Properties Section -->
-                    <div class="analytics-card properties">
-                        <h3><?php _e('User Properties', 'growtype-analytics'); ?></h3>
-                        <div id="posthog-properties"></div>
-                    </div>
+                        <!-- Properties Section -->
+                        <div class="analytics-card properties">
+                            <h3><?php _e('User Properties', 'growtype-analytics'); ?></h3>
+                            <div id="posthog-properties"></div>
+                        </div>
 
-                    <!-- Drop-off Analysis -->
-                    <div class="analytics-card dropoff">
-                        <h3><?php _e('Drop-off Points', 'growtype-analytics'); ?></h3>
-                        <div id="posthog-dropoff"></div>
-                    </div>
+                        <!-- Drop-off Analysis -->
+                        <div class="analytics-card dropoff">
+                            <h3><?php _e('Drop-off Points', 'growtype-analytics'); ?></h3>
+                            <div id="posthog-dropoff"></div>
+                        </div>
 
-                    <!-- User Journey Section -->
-                    <div class="analytics-card journey" style="grid-column: 1 / -1;">
-                        <h3><?php _e('User Journey & Page Visits', 'growtype-analytics'); ?></h3>
-                        <div id="posthog-journey"></div>
-                    </div>
+                        <!-- User Journey Section -->
+                        <div class="analytics-card journey" style="grid-column: 1 / -1;">
+                            <h3><?php _e('User Journey & Page Visits', 'growtype-analytics'); ?></h3>
+                            <div id="posthog-journey"></div>
+                        </div>
 
-                    <!-- Conversion Funnel -->
-                    <div class="analytics-card funnel" style="grid-column: 1 / -1;">
-                        <h3><?php _e('Conversion Funnel', 'growtype-analytics'); ?></h3>
-                        <div id="posthog-funnel"></div>
-                    </div>
+                        <!-- Conversion Funnel -->
+                        <div class="analytics-card funnel" style="grid-column: 1 / -1;">
+                            <h3><?php _e('Conversion Funnel', 'growtype-analytics'); ?></h3>
+                            <div id="posthog-funnel"></div>
+                        </div>
 
-                    <!-- Events Section -->
-                    <div class="analytics-card events" style="grid-column: 1 / -1;">
-                        <h3><?php _e('Recent Events', 'growtype-analytics'); ?></h3>
-                        <div id="posthog-events"></div>
+                        <!-- Events Section -->
+                        <div class="analytics-card events" style="grid-column: 1 / -1;">
+                            <h3><?php _e('Recent Events', 'growtype-analytics'); ?></h3>
+                            <div id="posthog-events"></div>
+                        </div>
                     </div>
                 </div>
             </div>
