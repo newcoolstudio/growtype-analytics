@@ -305,6 +305,11 @@ class Growtype_Analytics_Tracking_Ga
         $script .= "  window.dataLayer.push({ event: $event_name_js, data: $json_data });\n";
         $script .= "}\n";
 
+        /**
+         * Allow other tracking services to append scripts alongside the dataLayer push
+         */
+        $script = apply_filters('growtype_analytics_data_layer_script_additions', $script, $event_name, $data);
+
         if ($clear_history) {
             $script .= <<<JS
 history.pushState(null, document.title, location.href);

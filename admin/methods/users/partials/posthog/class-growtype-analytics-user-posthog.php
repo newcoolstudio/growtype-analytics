@@ -40,73 +40,91 @@ class Growtype_Analytics_User_PostHog
             return new WP_Error('missing_credentials', __('PostHog API credentials are not configured. Please configure them in Settings > Growtype - Analytics.', 'growtype-analytics'));
         }
 
-        // Query PostHog API for events related to this user email
         $api_url = trailingslashit($host) . 'api/projects/' . $project_id . '/events/';
+        $headers = array(
+            'Authorization' => 'Bearer ' . $api_key,
+            'Content-Type' => 'application/json',
+        );
 
-        $response = wp_remote_get($api_url, array (
-            'headers' => array (
-                'Authorization' => 'Bearer ' . $api_key,
-                'Content-Type' => 'application/json',
-            ),
-            'timeout' => 30,
-            'body' => array (
-                'properties' => json_encode(array (
-                    array (
-                        'key' => 'email',
-                        'value' => $user_email,
-                        'operator' => 'exact'
-                    )
-                )),
-                'limit' => 50
-            )
+        // Step 1: Find the distinct_id associated with this user
+        // We query events that have the email in their properties. WP_Http ignores body in GET, so we must use query params.
+        $properties_filter = json_encode(array(
+            array('key' => 'email', 'value' => $user_email, 'operator' => 'exact')
+        ));
+        
+        $find_url = $api_url . '?properties=' . urlencode($properties_filter) . '&limit=1';
+
+        $find_response = wp_remote_get($find_url, array(
+            'headers' => $headers,
+            'timeout' => 30
         ));
 
-        if (is_wp_error($response)) {
-            return $response;
+        if (is_wp_error($find_response)) {
+            return $find_response;
         }
 
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
+        $find_body = wp_remote_retrieve_body($find_response);
+        $find_data = json_decode($find_body, true);
 
-        if (wp_remote_retrieve_response_code($response) !== 200) {
-            return new WP_Error('api_error', __('PostHog API returned an error: ', 'growtype-analytics') . ($data['detail'] ?? 'Unknown error'));
+        if (wp_remote_retrieve_response_code($find_response) !== 200) {
+            return new WP_Error('api_error', __('PostHog API returned an error: ', 'growtype-analytics') . ($find_data['detail'] ?? 'Unknown error'));
         }
 
-        // Fetch person data
+        $distinct_id = null;
+        if (!empty($find_data['results']) && isset($find_data['results'][0]['distinct_id'])) {
+            $distinct_id = $find_data['results'][0]['distinct_id'];
+        }
+
+        // Fallback: If no distinct_id found, we try looking up by person search
         $person_url = trailingslashit($host) . 'api/projects/' . $project_id . '/persons/';
+        if (!$distinct_id) {
+            $search_url = $person_url . '?search=' . urlencode($user_email);
+            $search_response = wp_remote_get($search_url, array('headers' => $headers, 'timeout' => 30));
+            if (!is_wp_error($search_response) && wp_remote_retrieve_response_code($search_response) === 200) {
+                $search_data = json_decode(wp_remote_retrieve_body($search_response), true);
+                if (!empty($search_data['results']) && !empty($search_data['results'][0]['distinct_ids'])) {
+                    $distinct_id = $search_data['results'][0]['distinct_ids'][0];
+                }
+            }
+        }
 
-        $person_response = wp_remote_get($person_url, array (
-            'headers' => array (
-                'Authorization' => 'Bearer ' . $api_key,
-                'Content-Type' => 'application/json',
-            ),
-            'timeout' => 30,
-            'body' => array (
-                'email' => $user_email
-            )
-        ));
+        $events = array();
+        $person_data = array();
 
-        $person_data = array ();
-        if (!is_wp_error($person_response) && wp_remote_retrieve_response_code($person_response) === 200) {
-            $person_body = wp_remote_retrieve_body($person_response);
-            $person_data = json_decode($person_body, true);
+        // Step 2: If we found a distinct_id, fetch all their events and person profile
+        if ($distinct_id) {
+            $events_url = $api_url . '?distinct_id=' . urlencode($distinct_id) . '&limit=100';
+            $events_response = wp_remote_get($events_url, array('headers' => $headers, 'timeout' => 30));
+
+            if (!is_wp_error($events_response) && wp_remote_retrieve_response_code($events_response) === 200) {
+                $events_data = json_decode(wp_remote_retrieve_body($events_response), true);
+                $events = $events_data['results'] ?? array();
+            }
+
+            $person_fetch_url = $person_url . '?distinct_id=' . urlencode($distinct_id);
+            $person_response = wp_remote_get($person_fetch_url, array('headers' => $headers, 'timeout' => 30));
+
+            if (!is_wp_error($person_response) && wp_remote_retrieve_response_code($person_response) === 200) {
+                $person_body = json_decode(wp_remote_retrieve_body($person_response), true);
+                $person_data = $person_body['results'] ?? array();
+            }
         }
 
         // Analyze drop-off points
-        $dropoff = $this->analyze_dropoff($data['results'] ?? array ());
+        $dropoff = $this->analyze_dropoff($events);
 
         // Build user journey
-        $journey = $this->build_journey($data['results'] ?? array ());
+        $journey = $this->build_journey($events);
 
         // Build conversion funnel
-        $funnel = $this->build_funnel($data['results'] ?? array (), $user_email);
+        $funnel = $this->build_funnel($events, $user_email);
 
         return array (
-            'events' => $data['results'] ?? array (),
-            'properties' => $person_data['results'][0]['properties'] ?? array (),
+            'events' => $events,
+            'properties' => $person_data[0]['properties'] ?? array (),
             'sessions' => array (
-                'total_events' => count($data['results'] ?? array ()),
-                'last_seen' => $person_data['results'][0]['created_at'] ?? null
+                'total_events' => count($events),
+                'last_seen' => $person_data[0]['created_at'] ?? null
             ),
             'dropoff' => $dropoff,
             'journey' => $journey,

@@ -387,16 +387,31 @@
         html += '<th>Properties</th>';
         html += '</tr></thead><tbody>';
 
-        events.forEach(function (event) {
+        events.forEach(function (event, index) {
             html += '<tr>';
             html += '<td><strong>' + escapeHtml(event.event || 'Unknown') + '</strong></td>';
             html += '<td>' + escapeHtml(event.timestamp || '') + '</td>';
-            html += '<td><pre>' + escapeHtml(JSON.stringify(event.properties || {}, null, 2)) + '</pre></td>';
+            html += '<td>';
+            html += '<button type="button" class="button button-small toggle-properties" data-index="' + index + '">Show Properties</button>';
+            html += '<pre id="props-' + index + '" style="display:none; margin-top: 10px;">' + escapeHtml(JSON.stringify(event.properties || {}, null, 2)) + '</pre>';
+            html += '</td>';
             html += '</tr>';
         });
 
         html += '</tbody></table>';
         $container.html(html);
+
+        $container.find('.toggle-properties').on('click', function() {
+            const index = $(this).data('index');
+            const $pre = $('#props-' + index);
+            if ($pre.is(':visible')) {
+                $pre.hide();
+                $(this).text('Show Properties');
+            } else {
+                $pre.show();
+                $(this).text('Hide Properties');
+            }
+        });
     }
 
     /**
