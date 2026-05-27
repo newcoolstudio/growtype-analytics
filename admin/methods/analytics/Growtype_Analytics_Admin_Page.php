@@ -376,6 +376,36 @@ class Growtype_Analytics_Admin_Page
             case 'extra_sections':
                 do_action('growtype_analytics_render_extra_sections', $date_from, $date_to, $this->decision_renderer);
                 break;
+            case 'registered_users':
+                // Bridge POST → $_GET (render logic reads from $_GET)
+                if (isset($_POST['orderby']))   $_GET['orderby']     = sanitize_text_field($_POST['orderby']);
+                if (isset($_POST['order']))     $_GET['order']       = sanitize_text_field($_POST['order']);
+                if (isset($_POST['paged']))     $_GET['paged']       = max(1, intval($_POST['paged']));
+                if (isset($_POST['user_search'])) $_GET['user_search'] = sanitize_text_field($_POST['user_search']);
+                // user_filters is sent as CSV string (e.g. "paid_orders_only,zero_credits")
+                $raw_filters = sanitize_text_field($_POST['user_filters'] ?? '');
+                $_GET['user_filters'] = $raw_filters !== ''
+                    ? array_values(array_filter(array_map('sanitize_key', explode(',', $raw_filters))))
+                    : [];
+
+                // Fix sort & pagination link generation:
+                // render_sortable_th builds URLs from $_GET, which must include 'page'
+                // paginate_links builds from $_SERVER['REQUEST_URI'], which is admin-ajax.php in AJAX context
+                $_GET['page'] = 'growtype-analytics-users';
+                $_SERVER['REQUEST_URI'] = add_query_arg(
+                    array_filter([
+                        'page'        => 'growtype-analytics-users',
+                        'date_from'   => $date_from,
+                        'date_to'     => $date_to,
+                        'orderby'     => $_GET['orderby'] ?? null,
+                        'order'       => $_GET['order']   ?? null,
+                        'user_search' => $_GET['user_search'] ?? null,
+                    ], fn($v) => $v !== null && $v !== ''),
+                    admin_url('admin.php')
+                );
+
+                $this->decision_renderer->render_registered_users_table($date_from, $date_to);
+                break;
         }
 
         $html = ob_get_clean();

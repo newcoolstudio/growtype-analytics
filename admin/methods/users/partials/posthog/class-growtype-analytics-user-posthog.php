@@ -493,6 +493,19 @@ class Growtype_Analytics_User_PostHog
             wp_send_json_error(array ('message' => $posthog_data->get_error_message()));
         }
 
+        // Cache traffic source to user meta so the users table can display it without API calls
+        $props = $posthog_data['properties'] ?? [];
+        $ph_source = [
+            'referrer'     => $props['$initial_referring_domain'] ?? $props['$referring_domain'] ?? '',
+            'utm_source'   => $props['$initial_utm_source']   ?? $props['utm_source']   ?? '',
+            'utm_medium'   => $props['$initial_utm_medium']   ?? $props['utm_medium']   ?? '',
+            'utm_campaign' => $props['$initial_utm_campaign'] ?? $props['utm_campaign'] ?? '',
+        ];
+        // Only save if we have at least one meaningful value
+        if (array_filter($ph_source)) {
+            update_user_meta($user_id, 'growtype_analytics_posthog_source', $ph_source);
+        }
+
         wp_send_json_success($posthog_data);
     }
 
@@ -536,15 +549,20 @@ class Growtype_Analytics_User_PostHog
                 padding: 15px;
                 box-shadow: 0 1px 1px rgba(0,0,0,.04);
             }
+            #posthog-properties,
+            #posthog-events {
+                max-height: 380px;
+                overflow: scroll;
+            }
         </style>
 
         <div class="analytics-section">
             <h2 class="posthog-toggle">
                 <span><?php _e('PostHog Analytics', 'growtype-analytics'); ?></span>
-                <span class="dashicons dashicons-arrow-down posthog-toggle-indicator"></span>
+                <span class="dashicons dashicons-arrow-up posthog-toggle-indicator"></span>
             </h2>
 
-            <div class="posthog-content" style="display: none;">
+            <div class="posthog-content">
                 <div id="posthog-loading" class="notice notice-info">
                     <p><?php _e('Loading analytics data...', 'growtype-analytics'); ?></p>
                 </div>

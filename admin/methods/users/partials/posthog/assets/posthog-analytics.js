@@ -116,6 +116,58 @@
             `;
         }
 
+        // 4. Traffic Source
+        const referringDomain = properties.$referring_domain || properties.$initial_referring_domain || '';
+        const initialReferrer  = properties.$initial_referrer || properties.$referrer || '';
+        const utmSource   = properties.utm_source   || properties.$initial_utm_source   || '';
+        const utmMedium   = properties.utm_medium   || properties.$initial_utm_medium   || '';
+        const utmCampaign = properties.utm_campaign || properties.$initial_utm_campaign || '';
+        const initialPath = escapeHtml(properties.$initial_pathname || '/');
+
+        if (utmSource || referringDomain) {
+            let sourceLabel, sourceIcon, sourceType;
+
+            if (utmSource) {
+                // Paid / tracked campaign
+                sourceLabel = utmSource.charAt(0).toUpperCase() + utmSource.slice(1);
+                if (utmMedium)   sourceLabel += ' / ' + utmMedium;
+                if (utmCampaign) sourceLabel += ' · ' + utmCampaign;
+                sourceIcon  = '📣';
+                sourceType  = 'warning';
+            } else {
+                // Organic referrer
+                sourceLabel = referringDomain;
+                sourceType  = 'info';
+                if (referringDomain.includes('google'))    sourceIcon = '🔍';
+                else if (referringDomain.includes('yandex'))    sourceIcon = '🔍';
+                else if (referringDomain.includes('bing'))      sourceIcon = '🔍';
+                else if (referringDomain.includes('facebook') || referringDomain.includes('instagram')) { sourceIcon = '📘'; sourceType = 'warning'; }
+                else if (referringDomain.includes('twitter') || referringDomain.includes('x.com'))      { sourceIcon = '🐦'; }
+                else if (referringDomain.includes('reddit'))    sourceIcon = '👾';
+                else                                            sourceIcon = '🔗';
+            }
+
+            insights_html += `
+                <div class="insight-box ${sourceType}">
+                    <div class="insight-icon">${sourceIcon}</div>
+                    <div class="insight-content">
+                        <h4>Traffic Source</h4>
+                        <p>Arrived from <strong>${escapeHtml(sourceLabel)}</strong> &middot; landed on <strong>${initialPath}</strong>.</p>
+                    </div>
+                </div>
+            `;
+        } else if (!initialReferrer || initialReferrer === '$direct') {
+            insights_html += `
+                <div class="insight-box info">
+                    <div class="insight-icon">🔖</div>
+                    <div class="insight-content">
+                        <h4>Traffic Source</h4>
+                        <p>Arrived <strong>Direct</strong> (typed URL or bookmark) &middot; landed on <strong>${initialPath}</strong>.</p>
+                    </div>
+                </div>
+            `;
+        }
+
         insights_html += '</div>';
 
         if (insights_html === '<div class="insights-grid"></div>') {

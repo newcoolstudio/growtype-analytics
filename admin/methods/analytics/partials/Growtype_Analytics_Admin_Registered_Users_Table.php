@@ -210,7 +210,7 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                 </td>
                                 <td><?php echo esc_html($user['ID']); ?></td>
                                 <td><?php echo esc_html($user['user_email']); ?></td>
-                                <td style="min-width:140px;">
+                                <td style="min-width:140px; max-width:200px;">
                                     <?php
                                     $marketing_badges = [];
                                     if (!empty($lead_post)) {
@@ -224,22 +224,53 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                                         $marketing_badges[] = [
                                                             'key'   => sanitize_text_field($source['key']),
                                                             'value' => sanitize_text_field($source['value']),
+                                                            'type'  => 'lead',
                                                         ];
                                                     }
                                                 }
                                             }
                                         }
                                     }
+
+                                    // PostHog traffic source (cached from user analytics page visit)
+                                    $ph_source = get_user_meta($user['ID'], 'growtype_analytics_posthog_source', true);
+                                    if (!empty($ph_source) && is_array($ph_source)) {
+                                        if (!empty($ph_source['referrer'])) {
+                                            $marketing_badges[] = [
+                                                'key'   => 'ph:referrer',
+                                                'value' => $ph_source['referrer'],
+                                                'type'  => 'posthog',
+                                            ];
+                                        }
+                                        foreach (['utm_source', 'utm_medium', 'utm_campaign'] as $utm_key) {
+                                            if (!empty($ph_source[$utm_key])) {
+                                                $marketing_badges[] = [
+                                                    'key'   => 'ph:' . $utm_key,
+                                                    'value' => $ph_source[$utm_key],
+                                                    'type'  => 'posthog_utm',
+                                                ];
+                                            }
+                                        }
+                                    }
+
                                     if (!empty($marketing_badges)):
+                                        ?><div style="max-height:120px; overflow-y:auto;"><?php
                                         foreach ($marketing_badges as $badge):
-                                            $is_utm = strpos($badge['key'], 'utm_') === 0;
-                                            $bg  = $is_utm ? '#e8f4fd' : '#f3f4f6';
-                                            $col = $is_utm ? '#1565c0' : '#374151';
+                                            if ($badge['type'] === 'posthog') {
+                                                $bg = '#e8f5e9'; $col = '#2e7d32'; // green — PH referrer
+                                            } elseif ($badge['type'] === 'posthog_utm') {
+                                                $bg = '#fff3e0'; $col = '#e65100'; // orange — PH utm
+                                            } elseif ($badge['type'] === 'lead' && strpos($badge['key'], 'utm_') === 0) {
+                                                $bg = '#e8f4fd'; $col = '#1565c0'; // blue — lead utm
+                                            } else {
+                                                $bg = '#f3f4f6'; $col = '#374151'; // grey — other lead
+                                            }
                                             echo '<div style="margin-bottom:3px; white-space:nowrap;">';
                                             echo '<span style="font-size:10px; color:#9e9e9e; margin-right:3px;">' . esc_html($badge['key']) . ':</span>';
                                             echo '<span style="display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600; background:' . $bg . '; color:' . $col . ';">' . esc_html($badge['value']) . '</span>';
                                             echo '</div>';
                                         endforeach;
+                                        ?></div><?php
                                     else:
                                         echo '<span style="color:#bbb;">—</span>';
                                     endif;

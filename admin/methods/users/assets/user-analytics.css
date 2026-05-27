@@ -492,13 +492,13 @@
 .insight-content h4 {
     margin: 0 0 8px;
     font-size: 16px;
-    color: white;
+    color: black;
 }
 
 .insight-content p {
     margin: 0;
     font-size: 14px;
-    color: rgba(255, 255, 255, 0.95);
+    color: black;
 }
 
 .insight-stats {
