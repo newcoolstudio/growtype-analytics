@@ -313,7 +313,17 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                     <?php echo $rv > 0 ? '<span style="color:#2e7d32;font-weight:700;">✓</span>' : '<span style="color:#9e9e9e;">–</span>'; ?>
                                 </td>
                                 <td><?php echo (int)($user['chat_credits_amount'] ?? 0); ?></td>
-                                <td><?php echo (int)($user['emails_sent'] ?? 0); ?></td>
+                                <td>
+                                    <?php $emails_sent_count = (int)($user['emails_sent'] ?? 0); ?>
+                                    <?php if ($emails_sent_count > 0): ?>
+                                        <a href="<?php echo esc_url(add_query_arg(['page' => 'growtype-mail-logs', 's' => $user['user_email']], admin_url('admin.php'))); ?>" target="_blank" style="font-weight:600; text-decoration:underline;">
+                                            <?php echo $emails_sent_count; ?>
+                                        </a>
+                                    <?php else: ?>
+                                        0
+                                    <?php endif; ?>
+                                </td>
+
                                 <td style="white-space:nowrap;">
                                     <div class="ga-actions-dropdown" style="position:relative; display:inline-block;">
                                         <button type="button" class="button button-small ga-actions-toggle">
