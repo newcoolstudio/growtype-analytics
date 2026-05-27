@@ -22,6 +22,9 @@ class Growtype_Analytics_User_PostHog
         // Register AJAX handler
         add_action('wp_ajax_get_user_posthog_data', array ($this, 'ajax_get_user_data'));
 
+        // Batch endpoint: fetch & cache PostHog source for multiple users in one request
+        add_action('wp_ajax_growtype_analytics_get_posthog_source_batch', array ($this, 'ajax_get_posthog_source_batch'));
+
         // Register analytics section renderer
         add_action('growtype_analytics_user_analytics_sections', array ($this, 'render_analytics_section'), 10);
     }
@@ -507,6 +510,114 @@ class Growtype_Analytics_User_PostHog
         }
 
         wp_send_json_success($posthog_data);
+    }
+
+    /**
+     * Batch AJAX handler: fetch & cache PostHog traffic source for multiple users in one request.
+     * - Reads meta cache for already-known users (no API call).
+     * - Uses curl_multi to fetch all unknown users from PostHog /persons in parallel.
+     * - Returns results keyed by user_id.
+     */
+    public function ajax_get_posthog_source_batch()
+    {
+        check_ajax_referer('growtype_analytics_nonce', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Insufficient permissions.']);
+        }
+
+        $raw_ids = $_POST['user_ids'] ?? [];
+        if (empty($raw_ids) || !is_array($raw_ids)) {
+            wp_send_json_error(['message' => 'No user IDs provided.']);
+        }
+
+        $user_ids = array_filter(array_map('intval', $raw_ids));
+        if (empty($user_ids)) {
+            wp_send_json_error(['message' => 'No valid user IDs.']);
+        }
+
+        $api_key    = get_option('growtype_analytics_posthog_details_api_key', '');
+        $project_id = get_option('growtype_analytics_posthog_details_project_id', '');
+        $host       = get_option('growtype_analytics_posthog_details_host', 'https://app.posthog.com');
+        $person_url = trailingslashit($host) . 'api/projects/' . $project_id . '/persons/';
+
+        $results   = [];   // user_id => source array
+        $to_fetch  = [];   // user_id => email (uncached)
+
+        // Bulk-load all user emails in one query
+        $users_map = [];
+        foreach (get_users(['include' => array_values($user_ids), 'fields' => ['ID', 'user_email']]) as $u) {
+            $users_map[(int)$u->ID] = $u->user_email;
+        }
+
+        // Prime the WP meta cache for all users in one query (avoids N individual meta queries)
+        update_meta_cache('user', array_values($user_ids));
+
+        // --- Pass 1: serve from cache ----------------------------------------
+        foreach ($user_ids as $uid) {
+            $cached = get_user_meta($uid, 'growtype_analytics_posthog_source', true);
+            if (!empty($cached) && is_array($cached)) {
+                $results[$uid] = $cached;
+            } elseif (isset($users_map[$uid])) {
+                $to_fetch[$uid] = $users_map[$uid];
+            }
+        }
+
+        // --- Pass 2: parallel PostHog /persons fetch for uncached users -------
+        if (!empty($to_fetch) && !empty($api_key) && !empty($project_id)) {
+            $mh      = curl_multi_init();
+            $handles = []; // user_id => curl handle
+
+            foreach ($to_fetch as $uid => $email) {
+                $url = $person_url . '?search=' . urlencode($email) . '&limit=1';
+                $ch  = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT        => 15,
+                    CURLOPT_HTTPHEADER     => [
+                        'Authorization: Bearer ' . $api_key,
+                        'Content-Type: application/json',
+                    ],
+                ]);
+                curl_multi_add_handle($mh, $ch);
+                $handles[$uid] = $ch;
+            }
+
+            // Execute all in parallel
+            do {
+                $status = curl_multi_exec($mh, $running);
+                if ($running) curl_multi_select($mh);
+            } while ($running && $status === CURLM_OK);
+
+            // Collect results
+            foreach ($handles as $uid => $ch) {
+                $body = curl_multi_getcontent($ch);
+                curl_multi_remove_handle($mh, $ch);
+                curl_close($ch);
+
+                if (!$body) continue;
+                $data = json_decode($body, true);
+                if (empty($data['results'][0]['properties'])) continue;
+
+                $props = $data['results'][0]['properties'];
+                $source = [
+                    'referrer'     => $props['$initial_referring_domain'] ?? $props['$referring_domain'] ?? '',
+                    'utm_source'   => $props['$initial_utm_source']   ?? $props['utm_source']   ?? '',
+                    'utm_medium'   => $props['$initial_utm_medium']   ?? $props['utm_medium']   ?? '',
+                    'utm_campaign' => $props['$initial_utm_campaign'] ?? $props['utm_campaign'] ?? '',
+                ];
+
+                if (array_filter($source)) {
+                    update_user_meta($uid, 'growtype_analytics_posthog_source', $source);
+                }
+
+                $results[$uid] = $source;
+            }
+
+            curl_multi_close($mh);
+        }
+
+        wp_send_json_success($results);
     }
 
     /**

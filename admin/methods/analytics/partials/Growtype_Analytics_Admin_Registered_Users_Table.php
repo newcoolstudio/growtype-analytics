@@ -210,7 +210,13 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                 </td>
                                 <td><?php echo esc_html($user['ID']); ?></td>
                                 <td><?php echo esc_html($user['user_email']); ?></td>
-                                <td style="min-width:140px; max-width:200px;">
+                                <?php $ph_source = get_user_meta($user['ID'], 'growtype_analytics_posthog_source', true); ?>
+                                <td style="min-width:140px; max-width:200px;"
+                                    <?php if (empty($ph_source) || !is_array($ph_source)): ?>
+                                        class="ga-ph-pending" data-user-id="<?php echo esc_attr($user['ID']); ?>"
+                                    <?php endif; ?>
+                                >
+                                    <div class="ga-mkt-badges" style="max-height:120px; overflow-y:auto;">
                                     <?php
                                     $marketing_badges = [];
                                     if (!empty($lead_post)) {
@@ -232,49 +238,36 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                                         }
                                     }
 
-                                    // PostHog traffic source (cached from user analytics page visit)
-                                    $ph_source = get_user_meta($user['ID'], 'growtype_analytics_posthog_source', true);
+                                    // PostHog traffic source (from cached user meta)
                                     if (!empty($ph_source) && is_array($ph_source)) {
                                         if (!empty($ph_source['referrer'])) {
-                                            $marketing_badges[] = [
-                                                'key'   => 'ph:referrer',
-                                                'value' => $ph_source['referrer'],
-                                                'type'  => 'posthog',
-                                            ];
+                                            $marketing_badges[] = ['key' => 'ph:referrer', 'value' => $ph_source['referrer'], 'type' => 'posthog'];
                                         }
                                         foreach (['utm_source', 'utm_medium', 'utm_campaign'] as $utm_key) {
                                             if (!empty($ph_source[$utm_key])) {
-                                                $marketing_badges[] = [
-                                                    'key'   => 'ph:' . $utm_key,
-                                                    'value' => $ph_source[$utm_key],
-                                                    'type'  => 'posthog_utm',
-                                                ];
+                                                $marketing_badges[] = ['key' => 'ph:' . $utm_key, 'value' => $ph_source[$utm_key], 'type' => 'posthog_utm'];
                                             }
                                         }
                                     }
 
-                                    if (!empty($marketing_badges)):
-                                        ?><div style="max-height:120px; overflow-y:auto;"><?php
-                                        foreach ($marketing_badges as $badge):
-                                            if ($badge['type'] === 'posthog') {
-                                                $bg = '#e8f5e9'; $col = '#2e7d32'; // green — PH referrer
-                                            } elseif ($badge['type'] === 'posthog_utm') {
-                                                $bg = '#fff3e0'; $col = '#e65100'; // orange — PH utm
-                                            } elseif ($badge['type'] === 'lead' && strpos($badge['key'], 'utm_') === 0) {
-                                                $bg = '#e8f4fd'; $col = '#1565c0'; // blue — lead utm
-                                            } else {
-                                                $bg = '#f3f4f6'; $col = '#374151'; // grey — other lead
-                                            }
-                                            echo '<div style="margin-bottom:3px; white-space:nowrap;">';
-                                            echo '<span style="font-size:10px; color:#9e9e9e; margin-right:3px;">' . esc_html($badge['key']) . ':</span>';
-                                            echo '<span style="display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600; background:' . $bg . '; color:' . $col . ';">' . esc_html($badge['value']) . '</span>';
-                                            echo '</div>';
-                                        endforeach;
-                                        ?></div><?php
-                                    else:
+                                    foreach ($marketing_badges as $badge):
+                                        if ($badge['type'] === 'posthog')           { $bg = '#e8f5e9'; $col = '#2e7d32'; }
+                                        elseif ($badge['type'] === 'posthog_utm')   { $bg = '#fff3e0'; $col = '#e65100'; }
+                                        elseif ($badge['type'] === 'lead' && strpos($badge['key'], 'utm_') === 0) { $bg = '#e8f4fd'; $col = '#1565c0'; }
+                                        else                                         { $bg = '#f3f4f6'; $col = '#374151'; }
+                                        echo '<div style="margin-bottom:3px; white-space:nowrap;">';
+                                        echo '<span style="font-size:10px; color:#9e9e9e; margin-right:3px;">' . esc_html($badge['key']) . ':</span>';
+                                        echo '<span style="display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600; background:' . $bg . '; color:' . $col . ';">' . esc_html($badge['value']) . '</span>';
+                                        echo '</div>';
+                                    endforeach;
+
+                                    if (empty($marketing_badges) && (empty($ph_source) || !is_array($ph_source))):
+                                        ?><span class="ga-ph-placeholder" style="color:#bbb; font-size:11px;">…</span><?php
+                                    elseif (empty($marketing_badges)):
                                         echo '<span style="color:#bbb;">—</span>';
                                     endif;
                                     ?>
+                                    </div>
                                 </td>
                                 <td><?php echo esc_html(wp_date(get_option('date_format') . ' H:i', strtotime($user['user_registered']))); ?></td>
                                 <td>
@@ -580,6 +573,54 @@ class Growtype_Analytics_Admin_Registered_Users_Table
                     $status.text('Request failed. Check permissions or try again.');
                 });
             }
+        })(jQuery);
+        </script>
+        <script>
+        // Single batch request to populate all pending PostHog marketing cells
+        (function($) {
+            var pendingCells = $('.ga-ph-pending');
+            if (!pendingCells.length) return;
+
+            var userIds = pendingCells.map(function() {
+                return $(this).data('user-id');
+            }).get();
+
+            var ajaxUrl = '<?php echo esc_js(admin_url('admin-ajax.php')); ?>';
+            var nonce   = '<?php echo esc_js(wp_create_nonce('growtype_analytics_nonce')); ?>';
+
+            function renderPhBadges(source) {
+                var badges = [];
+                if (source.referrer)     badges.push({ key: 'ph:referrer',     val: source.referrer,     bg: '#e8f5e9', col: '#2e7d32' });
+                if (source.utm_source)   badges.push({ key: 'ph:utm_source',   val: source.utm_source,   bg: '#fff3e0', col: '#e65100' });
+                if (source.utm_medium)   badges.push({ key: 'ph:utm_medium',   val: source.utm_medium,   bg: '#fff3e0', col: '#e65100' });
+                if (source.utm_campaign) badges.push({ key: 'ph:utm_campaign', val: source.utm_campaign, bg: '#fff3e0', col: '#e65100' });
+                if (!badges.length) return '';
+                return badges.map(function(b) {
+                    return '<div style="margin-bottom:3px;white-space:nowrap;">'
+                         + '<span style="font-size:10px;color:#9e9e9e;margin-right:3px;">' + b.key + ':</span>'
+                         + '<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600;background:' + b.bg + ';color:' + b.col + ';">' + $('<span>').text(b.val).html() + '</span>'
+                         + '</div>';
+                }).join('');
+            }
+
+            $.post(ajaxUrl, {
+                action   : 'growtype_analytics_get_posthog_source_batch',
+                nonce    : nonce,
+                user_ids : userIds,
+            }, function(resp) {
+                if (!resp.success || !resp.data) return;
+                $.each(resp.data, function(userId, source) {
+                    var $td  = $('[data-user-id="' + userId + '"].ga-ph-pending');
+                    var html = renderPhBadges(source);
+                    $td.find('.ga-ph-placeholder').remove();
+                    if (html) {
+                        $td.removeClass('ga-ph-pending').removeAttr('data-user-id');
+                        $td.find('.ga-mkt-badges').append(html);
+                    } else {
+                        $td.find('.ga-mkt-badges').append('<span style="color:#bbb;">—</span>');
+                    }
+                });
+            });
         })(jQuery);
         </script>
         <?php
