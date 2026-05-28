@@ -196,15 +196,46 @@ class Growtype_Analytics_User_Chat
     }
 
     /**
-     * Get internal chat user ID from WP user ID
+     * Get internal chat user ID from WP user ID.
+     *
+     * Uses ORDER BY created_at DESC LIMIT 1 so that recycled WP user IDs
+     * (where a deleted user's ID was later reassigned to a new account)
+     * always resolve to the most recent — i.e. the current user's — chat record.
      */
     private function get_chat_user_id($wp_user_id)
     {
         global $wpdb;
-        return $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM {$wpdb->prefix}growtype_chat_users WHERE external_id = %d",
-            $wp_user_id
+
+        // Anchor to the WP user's own registration date so we never return a
+        // chat_user row that was created before this WP account existed.
+        $wp_user = get_userdata($wp_user_id);
+        $registered = $wp_user ? $wp_user->user_registered : '2000-01-01 00:00:00';
+
+        $id = $wpdb->get_var($wpdb->prepare(
+            "SELECT id
+             FROM {$wpdb->prefix}growtype_chat_users
+             WHERE external_id = %d
+               AND created_at >= %s
+             ORDER BY created_at DESC
+             LIMIT 1",
+            $wp_user_id,
+            $registered
         ));
+
+        // Fallback: if nothing found after registration date (edge case), return
+        // the most recent record regardless — still deterministic.
+        if (!$id) {
+            $id = $wpdb->get_var($wpdb->prepare(
+                "SELECT id
+                 FROM {$wpdb->prefix}growtype_chat_users
+                 WHERE external_id = %d
+                 ORDER BY created_at DESC
+                 LIMIT 1",
+                $wp_user_id
+            ));
+        }
+
+        return $id;
     }
 
     /**
