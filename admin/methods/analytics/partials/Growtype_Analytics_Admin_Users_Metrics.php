@@ -29,7 +29,11 @@ class Growtype_Analytics_Admin_Users_Metrics
         global $wpdb;
         $settings = $this->controller->metrics->get_snapshot_settings();
         $email_exclusion = $this->controller->metrics->build_email_exclusion_sql('u.user_email', $settings['excluded_email_patterns']);
-        $period_sql = $this->controller->metrics->build_period_sql('u.user_registered', $days);
+        
+        // Bypass the registration period constraint if a search term is specified
+        $period_sql = !empty($user_search)
+            ? ['sql' => '', 'params' => []]
+            : $this->controller->metrics->build_period_sql('u.user_registered', $days);
 
         $offset = ($paged - 1) * $per_page;
         $paid_statuses = $settings['paid_statuses'];
