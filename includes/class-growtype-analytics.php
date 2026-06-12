@@ -235,7 +235,7 @@ class Growtype_Analytics
     {
         $plugin_public = new Growtype_Analytics_Public($this->get_Growtype_Analytics(), $this->get_version());
 
-        $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_styles');
+        // $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_styles');
         $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_scripts');
     }
 

@@ -43,7 +43,7 @@ class Growtype_Analytics_Admin_Reports
 
     public function get_top_characters_by_revenue_data($args = [])
     {
-        $page = $this->controller->get_page_by_class('Growtype_Child_Growtype_Analytics_Admin_Page_Characters');
+        $page = apply_filters('growtype_analytics_characters_revenue_page', null, $this->controller);
         return $page ? $page->get_top_characters_by_revenue_data($args) : array();
     }
 }

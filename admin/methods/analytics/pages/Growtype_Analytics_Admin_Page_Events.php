@@ -101,7 +101,7 @@ class Growtype_Analytics_Admin_Page_Events extends Growtype_Analytics_Admin_Base
                 [],
                 'search_events',
                 $search_query,
-                __('Search metadata or email...', 'growtype-analytics')
+                __('Search event type, metadata, or email...', 'growtype-analytics')
             );
             ?>
 
@@ -123,7 +123,7 @@ class Growtype_Analytics_Admin_Page_Events extends Growtype_Analytics_Admin_Base
                 if ($event['user_id'] > 0) {
                     $user = get_user_by('id', $event['user_id']);
                     if ($user) {
-                        $user_html = '<a href="' . get_edit_user_link($user->ID) . '"><strong>' . esc_html($user->display_name) . '</strong></a>';
+                        $user_html = '<a href="' . get_edit_user_link($user->ID) . '"><strong>' . esc_html($user->user_email) . '</strong></a>';
                     } else {
                         $user_html = 'User #' . esc_html($event['user_id']);
                     }
@@ -194,7 +194,8 @@ class Growtype_Analytics_Admin_Page_Events extends Growtype_Analytics_Admin_Base
 
         if (!empty($search_query)) {
             $search_like = '%' . $wpdb->esc_like($search_query) . '%';
-            $where_clauses[] = "({$table_name}.metadata LIKE %s OR EXISTS (SELECT 1 FROM {$wpdb->users} u WHERE u.ID = {$table_name}.user_id AND u.user_email LIKE %s))";
+            $where_clauses[] = "({$table_name}.metadata LIKE %s OR {$table_name}.event_type LIKE %s OR EXISTS (SELECT 1 FROM {$wpdb->users} u WHERE u.ID = {$table_name}.user_id AND u.user_email LIKE %s))";
+            $where_args[] = $search_like;
             $where_args[] = $search_like;
             $where_args[] = $search_like;
         }
