@@ -98,6 +98,7 @@ class Growtype_Analytics_Admin_Page
         switch ($name) {
             case 'decision_renderer':
                 require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Users_Filters.php';
+                require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Pagination.php';
                 require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Registered_Users_Table.php';
                 Growtype_Analytics_Admin_Registered_Users_Table::register_hooks();
 
@@ -106,6 +107,7 @@ class Growtype_Analytics_Admin_Page
 
                 return $this->decision_renderer;
             case 'table_renderer':
+                require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Pagination.php';
                 require_once GROWTYPE_ANALYTICS_PATH . 'admin/methods/analytics/partials/Growtype_Analytics_Admin_Table_Renderer.php';
                 $this->table_renderer = new Growtype_Analytics_Admin_Table_Renderer($this);
                 return $this->table_renderer;

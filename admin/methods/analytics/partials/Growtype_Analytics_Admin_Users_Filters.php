@@ -17,47 +17,17 @@ class Growtype_Analytics_Admin_Users_Filters
 
     public static function registry(): array
     {
-        return [
+        $registry = [
             'paid_orders_only' => [
                 'label'  => 'Paid Only',
                 'icon'   => '💳',
                 'color'  => '#0066cc',
                 'having' => 'paid_orders > 0',
                 'pages'  => ['growtype-analytics-users'],
-            ],
-            // 'has_messages' => [
-            //     'label'  => 'Has Messages',
-            //     'icon'   => '💬',
-            //     'color'  => '#00a32a',
-            //     'having' => 'message_count > 0',
-            // ],
-            'zero_credits' => [
-                'label'  => '0 Credits',
-                'icon'   => '🪙',
-                'color'  => '#d63638',
-                'having' => 'chat_credits_amount = 0',
-                'pages'  => ['growtype-analytics-users'],
-            ],
-            'has_characters' => [
-                'label'  => 'Has Characters',
-                'icon'   => '🤖',
-                'color'  => '#2e7d32',
-                'having' => '',
-                'pages'  => ['growtype-analytics-users'],
-            ],
-            'user_created' => [
-                'label'  => 'User Created',
-                'icon'   => '👤',
-                'color'  => '#2e7d32',
-                'pages'  => ['growtype-analytics-characters'],
-            ],
-            'public_characters' => [
-                'label'  => 'Public',
-                'icon'   => '🌍',
-                'color'  => '#0073aa',
-                'pages'  => ['growtype-analytics-characters'],
-            ],
+            ]
         ];
+
+        return apply_filters('growtype_analytics_filters_registry', $registry);
     }
 
     public static function active_from_request(): array

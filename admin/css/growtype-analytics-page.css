@@ -523,14 +523,18 @@
 }
 
 /* Pagination Styles */
-.analytics-recent-events .tablenav.bottom {
+.analytics-recent-events .tablenav.bottom,
+.tablenav.bottom {
     margin-top: 20px;
     height: auto;
     display: block;
     clear: both;
+    border-top: 1px solid #f0f0f1;
+    padding-top: 16px;
 }
 
-.analytics-recent-events .tablenav-pages {
+.analytics-recent-events .tablenav-pages,
+.tablenav.bottom .tablenav-pages {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -540,21 +544,27 @@
     height: auto;
 }
 
-.analytics-recent-events .displaying-num {
+.analytics-recent-events .displaying-num,
+.tablenav.bottom .displaying-num {
     font-size: 13px;
     font-style: italic;
-    margin-right: 15px;
+    color: #8c8f94;
     float: none;
 }
 
-.analytics-recent-events .tablenav-pages .pagination-links {
+.analytics-recent-events .tablenav-pages .pagination-links,
+.tablenav.bottom .tablenav-pages .pagination-links {
     display: flex;
+    align-items: center;
     gap: 4px;
     float: none;
 }
 
+/* Page number links and spans */
 .analytics-recent-events .tablenav-pages .pagination-links .page-numbers,
-.analytics-recent-events .tablenav-pages .pagination-links .tablenav-pages-navspan {
+.analytics-recent-events .tablenav-pages .pagination-links .tablenav-pages-navspan,
+.tablenav.bottom .tablenav-pages .pagination-links .page-numbers,
+.tablenav.bottom .tablenav-pages .pagination-links .tablenav-pages-navspan {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -568,24 +578,80 @@
     color: #2c3338;
     font-size: 13px;
     font-weight: 500;
-    transition: all 0.2s ease;
-    margin: 0 2px;
+    transition: all 0.15s ease;
+    line-height: 1;
 }
 
-.analytics-recent-events .tablenav-pages .pagination-links a.page-numbers:hover {
+/* Hover state for links */
+.analytics-recent-events .tablenav-pages .pagination-links a.page-numbers:hover,
+.tablenav.bottom .tablenav-pages .pagination-links a.page-numbers:hover {
     background: #f6f7f7 !important;
     border-color: #8c8f94 !important;
     color: #2271b1 !important;
 }
 
-.analytics-recent-events .tablenav-pages .pagination-links .page-numbers.current {
-    background: #2271b1 !important;
-    border-color: #2271b1 !important;
-    color: #fff !important;
-}
-
-.analytics-recent-events .tablenav-pages .pagination-links .tablenav-pages-navspan {
+/* Disabled prev/next spans */
+.analytics-recent-events .tablenav-pages .pagination-links .tablenav-pages-navspan,
+.tablenav.bottom .tablenav-pages .pagination-links .tablenav-pages-navspan {
     background: #f0f0f1;
     color: #a7aaad;
     cursor: default;
+}
+
+/* Dots */
+.analytics-recent-events .tablenav-pages .pagination-links .page-numbers.dots,
+.tablenav.bottom .tablenav-pages .pagination-links .page-numbers.dots {
+    background: transparent;
+    border-color: transparent;
+    color: #a7aaad;
+    cursor: default;
+    min-width: 20px;
+}
+
+/* Paging input (current page number field) */
+.analytics-recent-events .tablenav-pages .pagination-links .paging-input,
+.tablenav.bottom .tablenav-pages .pagination-links .paging-input {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 12px;
+    padding-left: 14px;
+    border-left: 1px solid #dcdcde;
+}
+
+.analytics-recent-events .tablenav-pages .pagination-links .paging-input .current-page,
+.tablenav.bottom .tablenav-pages .pagination-links .paging-input .current-page {
+    width: 48px !important;
+    height: 32px !important;
+    padding: 0 6px !important;
+    text-align: center !important;
+    border: 1px solid #2271b1 !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    color: #2271b1 !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+    vertical-align: middle !important;
+    box-shadow: 0 0 0 2px rgba(34, 113, 177, 0.12) !important;
+    transition: box-shadow 0.15s ease !important;
+}
+
+.analytics-recent-events .tablenav-pages .pagination-links .paging-input .current-page:focus,
+.tablenav.bottom .tablenav-pages .pagination-links .paging-input .current-page:focus {
+    box-shadow: 0 0 0 3px rgba(34, 113, 177, 0.25) !important;
+    outline: none !important;
+}
+
+.analytics-recent-events .tablenav-pages .pagination-links .tablenav-paging-text,
+.tablenav.bottom .tablenav-pages .pagination-links .tablenav-paging-text {
+    font-size: 13px;
+    color: #646970;
+    white-space: nowrap;
+}
+
+.analytics-recent-events .tablenav-pages .pagination-links .tablenav-paging-text .total-pages,
+.tablenav.bottom .tablenav-pages .pagination-links .tablenav-paging-text .total-pages {
+    font-weight: 600;
+    color: #2c3338;
 }

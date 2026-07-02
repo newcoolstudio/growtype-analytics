@@ -349,27 +349,8 @@ class Growtype_Analytics_Admin_Registered_Users_Table
 
                 <?php /* Pagination */ ?>
                 <?php
-                $total_pages = ceil($total_items / $per_page);
-                if ($total_pages > 1):
-                    $base_url = $_SERVER['REQUEST_URI'] ?? admin_url('admin.php');
-                    $base = add_query_arg('paged', '%#%', remove_query_arg(['paged', 'refresh'], $base_url));
+                Growtype_Analytics_Admin_Pagination::render($total_items, $per_page, $paged);
                 ?>
-                    <div class="tablenav bottom">
-                        <div class="tablenav-pages">
-                            <span class="displaying-num"><?php printf(_n('%s item', '%s items', $total_items, 'growtype-analytics'), number_format_i18n($total_items)); ?></span>
-                            <span class="pagination-links">
-                                <?php echo paginate_links([
-                                    'base'      => $base,
-                                    'format'    => '',
-                                    'prev_text' => __('&laquo;'),
-                                    'next_text' => __('&raquo;'),
-                                    'total'     => $total_pages,
-                                    'current'   => $paged,
-                                ]); ?>
-                            </span>
-                        </div>
-                    </div>
-                <?php endif; ?>
             </div>
         </div>
 
