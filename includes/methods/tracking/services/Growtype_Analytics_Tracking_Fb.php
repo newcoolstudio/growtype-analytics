@@ -15,6 +15,17 @@ class Growtype_Analytics_Tracking_Fb
         add_action('woocommerce_payment_complete', array ($this, 'woocommerce_payment_complete_extend'), 10, 4);
         add_action('woocommerce_order_status_processing', array ($this, 'woocommerce_payment_complete_extend'), 10, 1);
         add_action('woocommerce_order_status_completed', array ($this, 'woocommerce_payment_complete_extend'), 10, 1);
+
+        /**
+         * Growtype form email page submit (backend CAPI CompleteRegistration)
+         */
+        add_action('growtype_form_email_page_submitted', array ($this, 'track_complete_registration'), 10, 2);
+
+        /**
+         * Growtype quiz complete (backend CAPI QuizComplete)
+         */
+        add_action('growtype_quiz_after_save_data', array ($this, 'track_quiz_complete_after_save'), 10, 2);
+        add_action('growtype_quiz_after_update_data', array ($this, 'track_quiz_complete_after_update'), 10, 2);
     }
 
     function set_fb_cookie_params()
@@ -106,10 +117,13 @@ class Growtype_Analytics_Tracking_Fb
             'data' => json_encode($data)
         ];
 
-        if (!empty(getenv('GROWTYPE_ANALYTICS_FACEBOOK_TEST_EVENT_CODE'))) {
-            $query_params['test_event_code'] = getenv('GROWTYPE_ANALYTICS_FACEBOOK_TEST_EVENT_CODE');
+        $testing_enabled = filter_var(getenv('GROWTYPE_ANALYTICS_FACEBOOK_EVENTS_TESTING_ENABLED'), FILTER_VALIDATE_BOOLEAN);
+        $test_event_code = getenv('GROWTYPE_ANALYTICS_FACEBOOK_TEST_EVENT_CODE');
 
-            error_log(sprintf('Growtype Analytics: Facebook event TEST EVENT CODE ENABLED: %s', getenv('GROWTYPE_ANALYTICS_FACEBOOK_TEST_EVENT_CODE')));
+        if ($testing_enabled && !empty($test_event_code)) {
+            $query_params['test_event_code'] = $test_event_code;
+
+            error_log(sprintf('Growtype Analytics: Facebook event TEST EVENT CODE ENABLED: %s', $test_event_code));
         }
 
         $payload_encoded = http_build_query($query_params);
@@ -132,5 +146,95 @@ class Growtype_Analytics_Tracking_Fb
         curl_close($ch);
 
         return $response;
+    }
+
+    public function track_complete_registration($email, $context = [])
+    {
+        $email = is_string($email) ? trim($email) : '';
+
+        if (empty($email) || !is_email($email)) {
+            return;
+        }
+
+        $event_source_url = '';
+        if (is_array($context) && !empty($context['event_source_url'])) {
+            $event_source_url = $context['event_source_url'];
+        }
+        if (empty($event_source_url)) {
+            $event_source_url = function_exists('home_url') ? home_url('/') : '';
+        }
+
+        $fb_data = [
+            [
+                'event_name' => 'CompleteRegistration',
+                'event_time' => time(),
+                'action_source' => 'website',
+                'event_source_url' => $event_source_url,
+                'user_data' => [
+                    'client_ip_address' => growtype_analytics_get_client_ip(),
+                    'client_user_agent' => growtype_analytics_get_client_user_agent(),
+                    'em' => hash('sha256', strtolower($email)),
+                    'fbc' => isset($_COOKIE['_fbc']) ? $_COOKIE['_fbc'] : '',
+                ],
+            ],
+        ];
+
+        $this->init_facebook_event($fb_data);
+    }
+
+    public function track_quiz_complete_after_save($quiz_id, $submitted_quiz_data = [])
+    {
+        $quiz_id = (int) $quiz_id;
+        $this->track_quiz_complete($submitted_quiz_data, $quiz_id);
+    }
+
+    public function track_quiz_complete_after_update($existing_quiz_data = [], $submitted_quiz_data = [])
+    {
+        $quiz_id = isset($existing_quiz_data['quiz_id']) ? (int) $existing_quiz_data['quiz_id'] : 0;
+        $this->track_quiz_complete($submitted_quiz_data, $quiz_id);
+    }
+
+    private function track_quiz_complete($submitted_quiz_data = [], $quiz_id = 0)
+    {
+        if (!is_array($submitted_quiz_data) || empty($submitted_quiz_data['answers'])) {
+            return;
+        }
+
+        $extra_details = isset($submitted_quiz_data['extra_details']) && is_array($submitted_quiz_data['extra_details'])
+            ? $submitted_quiz_data['extra_details']
+            : [];
+
+        $email = '';
+        if (!empty($extra_details['email'])) {
+            $candidate_email = sanitize_email($extra_details['email']);
+            if (is_email($candidate_email)) {
+                $email = strtolower(trim($candidate_email));
+            }
+        }
+
+        $event_source_url = !empty($extra_details['http_referer'])
+            ? esc_url_raw($extra_details['http_referer'])
+            : (function_exists('home_url') ? home_url('/') : '');
+
+        $fb_event = [
+            'event_name' => 'QuizComplete',
+            'event_time' => time(),
+            'action_source' => 'website',
+            'event_source_url' => $event_source_url,
+            'user_data' => [
+                'client_ip_address' => growtype_analytics_get_client_ip(),
+                'client_user_agent' => growtype_analytics_get_client_user_agent(),
+                'fbc' => isset($_COOKIE['_fbc']) ? $_COOKIE['_fbc'] : '',
+            ],
+            'custom_data' => [
+                'quiz_id' => $quiz_id,
+            ],
+        ];
+
+        if (!empty($email)) {
+            $fb_event['user_data']['em'] = hash('sha256', $email);
+        }
+
+        $this->init_facebook_event([$fb_event]);
     }
 }

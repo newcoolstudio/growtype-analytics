@@ -1,3 +1,5 @@
+import {pushEventToFacebook} from "./growtypeFacebookBridge";
+
 // Optional debug
 const GTAC_DEBUG = false;
 
@@ -5,12 +7,14 @@ const GTAC_DEBUG = false;
 window._gtacQueue = window._gtacQueue || [];
 
 // Unified analytics function
-window.growtypeAnalyticsCapture = function(event, data = {}) {
+window.growtypeAnalyticsCapture = function(event, data = {}, options = {}) {
     if (!event) return;
     if (!data) data = {};
 
     // Push event to queue
     window._gtacQueue.push({ event, data });
+
+    pushEventToFacebook(event, data, options);
 
     if (GTAC_DEBUG) console.log('Event queued:', event, data);
 };
