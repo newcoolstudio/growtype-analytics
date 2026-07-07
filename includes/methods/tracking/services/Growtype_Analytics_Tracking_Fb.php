@@ -15,6 +15,7 @@ class Growtype_Analytics_Tracking_Fb
         add_action('woocommerce_payment_complete', array ($this, 'woocommerce_payment_complete_extend'), 10, 4);
         add_action('woocommerce_order_status_processing', array ($this, 'woocommerce_payment_complete_extend'), 10, 1);
         add_action('woocommerce_order_status_completed', array ($this, 'woocommerce_payment_complete_extend'), 10, 1);
+        add_action('template_redirect', array ($this, 'track_checkout_funnel_visit'), 20);
 
         /**
          * Growtype form email page submit (backend CAPI CompleteRegistration)
@@ -180,6 +181,60 @@ class Growtype_Analytics_Tracking_Fb
         ];
 
         $this->init_facebook_event($fb_data);
+    }
+
+    public function track_checkout_funnel_visit()
+    {
+        if (is_admin() || (function_exists('wp_doing_ajax') && wp_doing_ajax()) || !class_exists('WooCommerce')) {
+            return;
+        }
+
+        $is_checkout = function_exists('growtype_wc_is_checkout_page') ? growtype_wc_is_checkout_page() : is_checkout();
+        $is_payment = function_exists('growtype_wc_is_payment_page') ? growtype_wc_is_payment_page() : is_wc_endpoint_url('order-pay');
+
+        if (!$is_checkout && !$is_payment) {
+            return;
+        }
+
+        $cookie_key = $is_payment
+            ? '_growtype_analytics_fb_begin_payment_tracked'
+            : '_growtype_analytics_fb_begin_checkout_tracked';
+
+        if (!empty($_COOKIE[$cookie_key])) {
+            return;
+        }
+
+        $event_name = $is_payment ? 'AddPaymentInfo' : 'InitiateCheckout';
+        $value = WC()->cart ? (WC()->cart->total ?? '') : '';
+        $currency = function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : '';
+        $items = function_exists('growtype_wc_get_cart_items_gtm') ? growtype_wc_get_cart_items_gtm() : [];
+        $email = function_exists('growtype_analytics_get_user_email') ? growtype_analytics_get_user_email() : '';
+
+        $fb_event = [
+            'event_name' => $event_name,
+            'event_time' => time(),
+            'action_source' => 'website',
+            'event_source_url' => growtype_analytics_get_current_url(),
+            'user_data' => [
+                'client_ip_address' => growtype_analytics_get_client_ip(),
+                'client_user_agent' => growtype_analytics_get_client_user_agent(),
+                'fbc' => isset($_COOKIE['_fbc']) ? $_COOKIE['_fbc'] : '',
+            ],
+            'custom_data' => [
+                'currency' => $currency,
+                'value' => $value,
+                'contents' => is_array($items) ? $items : [],
+            ],
+        ];
+
+        if (!empty($email) && is_email($email)) {
+            $fb_event['user_data']['em'] = hash('sha256', strtolower(trim($email)));
+        }
+
+        $this->init_facebook_event([$fb_event]);
+
+        setcookie($cookie_key, '1', time() + (30 * 60), '/');
+        $_COOKIE[$cookie_key] = '1';
     }
 
     public function track_quiz_complete_after_save($quiz_id, $submitted_quiz_data = [])
