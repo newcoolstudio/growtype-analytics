@@ -17,6 +17,8 @@ class Growtype_Analytics_Tracking_Fb
         add_action('woocommerce_order_status_completed', array ($this, 'woocommerce_payment_complete_extend'), 10, 1);
         add_action('template_redirect', array ($this, 'track_checkout_funnel_visit'), 20);
 
+        add_action('init', array ($this, 'maybe_add_fb_test_purchase_order_actions'));
+
         /**
          * Growtype form email page submit (backend CAPI CompleteRegistration)
          */
@@ -100,7 +102,7 @@ class Growtype_Analytics_Tracking_Fb
         }
     }
 
-    public function init_facebook_event($data)
+    public function init_facebook_event($data, $force_test = false)
     {
         $pixel_id = apply_filters('growtype_analytics_facebook_pixel_id', getenv('GROWTYPE_ANALYTICS_FACEBOOK_PIXEL_ID'));
         $access_token = apply_filters('growtype_analytics_facebook_access_token', getenv('GROWTYPE_ANALYTICS_FACEBOOK_ACCESS_TOKEN'));
@@ -118,13 +120,20 @@ class Growtype_Analytics_Tracking_Fb
             'data' => json_encode($data)
         ];
 
-        $testing_enabled = filter_var(getenv('GROWTYPE_ANALYTICS_FACEBOOK_EVENTS_TESTING_ENABLED'), FILTER_VALIDATE_BOOLEAN);
         $test_event_code = getenv('GROWTYPE_ANALYTICS_FACEBOOK_TEST_EVENT_CODE');
 
-        if ($testing_enabled && !empty($test_event_code)) {
+        if ($force_test && !empty($test_event_code)) {
             $query_params['test_event_code'] = $test_event_code;
 
-            error_log(sprintf('Growtype Analytics: Facebook event TEST EVENT CODE ENABLED: %s', $test_event_code));
+            error_log(sprintf('Growtype Analytics: Facebook event TEST EVENT CODE FORCED: %s', $test_event_code));
+        } else {
+            $testing_enabled = filter_var(getenv('GROWTYPE_ANALYTICS_FACEBOOK_EVENTS_TESTING_ENABLED'), FILTER_VALIDATE_BOOLEAN);
+
+            if ($testing_enabled && !empty($test_event_code)) {
+                $query_params['test_event_code'] = $test_event_code;
+
+                error_log(sprintf('Growtype Analytics: Facebook event TEST EVENT CODE ENABLED: %s', $test_event_code));
+            }
         }
 
         $payload_encoded = http_build_query($query_params);
@@ -147,6 +156,93 @@ class Growtype_Analytics_Tracking_Fb
         curl_close($ch);
 
         return $response;
+    }
+
+    /**
+     * Register FB test purchase order actions (deferred to init so WooCommerce is loaded).
+     */
+    public function maybe_add_fb_test_purchase_order_actions()
+    {
+        if (!class_exists('WooCommerce')) {
+            return;
+        }
+
+        add_filter('woocommerce_order_actions', array ($this, 'add_fb_test_purchase_order_action'), 10, 2);
+        add_action('woocommerce_order_action_growtype_analytics_fb_test_purchase', array ($this, 'process_fb_test_purchase_order_action'));
+    }
+
+    /**
+     * Add "Send FB test purchase event" to WooCommerce order actions dropdown.
+     *
+     * @param array    $actions Order actions.
+     * @param WC_Order $order   Order object.
+     * @return array
+     */
+    public function add_fb_test_purchase_order_action($actions, $order = null)
+    {
+        $actions['growtype_analytics_fb_test_purchase'] = __('Send FB test purchase event', 'growtype-analytics');
+        return $actions;
+    }
+
+    /**
+     * Process the "Send FB test purchase event" order action.
+     *
+     * @param WC_Order $order Order object.
+     */
+    public function process_fb_test_purchase_order_action($order)
+    {
+        if (!$order) {
+            return;
+        }
+
+        $order_items = $order->get_items();
+        $value = $order->get_total();
+        $currency = get_woocommerce_currency();
+        $email = growtype_analytics_get_user_email();
+
+        $product_data = [];
+        foreach ($order_items as $order_item) {
+            $product = $order_item->get_product();
+
+            $product_data[] = [
+                'id' => $product ? $product->get_id() : '',
+                'quantity' => $order_item->get_quantity(),
+                'title' => $order_item->get_name(),
+            ];
+        }
+
+        $phone = $order->get_billing_phone();
+
+        $fb_data = [
+            [
+                'event_name' => 'Purchase',
+                'event_time' => time(),
+                'action_source' => 'website',
+                'event_source_url' => growtype_analytics_get_current_url(),
+                'user_data' => [
+                    'client_ip_address' => growtype_analytics_get_client_ip(),
+                    'client_user_agent' => growtype_analytics_get_client_user_agent(),
+                    'em' => hash('sha256', $email),
+                    'ph' => isset($phone) ? hash('sha256', preg_replace('/\D/', '', $phone)) : '',
+                    'fbc' => isset($_COOKIE['_fbc']) ? $_COOKIE['_fbc'] : '',
+                    'country' => isset($order) ? strtoupper($order->get_billing_country()) : '',
+                ],
+                'custom_data' => [
+                    'currency' => $currency,
+                    'value' => $value,
+                    'contents' => $product_data,
+                ],
+            ],
+        ];
+
+        $response = $this->init_facebook_event($fb_data, true);
+
+        $order->add_order_note(
+            sprintf(
+                __('FB test purchase event sent. Response: %s', 'growtype-analytics'),
+                $response ?: __('No response / Pixel ID or Access Token missing', 'growtype-analytics')
+            )
+        );
     }
 
     public function track_complete_registration($email, $context = [])
